@@ -1,6 +1,33 @@
 #pragma once
 #include <array>
 
+        // update the uniform color
+        //int vertexColorLocation = glGetUniformLocation(shaders.ID, "uniformColor");
+        //float greenage = (glm::sin(glfwGetTime()) + 1.0f) / 2.0f;
+        //glUniform4f(vertexColorLocation, 1.0f, greenage, 1.0f, 1.0f);
+
+        // uniform transformations
+        //glm::mat4 trans = glm::mat4(1.0f);
+        //trans = glm::translate(trans, glm::vec3(0.0f, -0.0f, 0.0f));
+        //trans = glm::rotate(trans, (float)glfwGetTime(), glm::vec3(0.0f, 0.0f, 1.0f));
+        //trans = glm::scale(trans, glm::vec3((glm::sin(glfwGetTime()) + 1.5f) / 2.0f, (glm::sin(glfwGetTime()) + 1.5f) / 2.0f, 1.0f));
+        //unsigned int transformLoc = glGetUniformLocation(shaders.ID, "transform");
+        //glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(trans));
+
+
+        // glm::vec3 cubePositions[] = {
+        //     glm::vec3( 0.0f,  0.0f,  0.0f), 
+        //     glm::vec3( 2.0f,  5.0f, -15.0f), 
+        //     glm::vec3(-1.5f, -2.2f, -2.5f),  
+        //     glm::vec3(-3.8f, -2.0f, -12.3f),  
+        //     glm::vec3( 2.4f, -0.4f, -3.5f),  
+        //     glm::vec3(-1.7f,  3.0f, -7.5f),  
+        //     glm::vec3( 1.3f, -2.0f, -2.5f),  
+        //     glm::vec3( 1.5f,  2.0f, -2.5f), 
+        //     glm::vec3( 1.5f,  0.2f, -1.5f), 
+        //     glm::vec3(-1.3f,  1.0f, -1.5f)  
+        // };
+
 class PrimitiveHelper {
     public:
         PrimitiveHelper(){}
@@ -48,6 +75,94 @@ class PrimitiveHelper {
             -0.5f,  0.5f,  0.5f,  0.0f, 1.0f, 1.0f,  0.0f, 0.0f,
             -0.5f,  0.5f, -0.5f,  1.0f, 1.0f, 1.0f,  0.0f, 1.0f
         };
+
+        std::array<float, 108> blandVerts = {
+            -0.5f, -0.5f, -0.5f, 
+            0.5f, -0.5f, -0.5f,  
+            0.5f,  0.5f, -0.5f,  
+            0.5f,  0.5f, -0.5f,  
+            -0.5f,  0.5f, -0.5f, 
+            -0.5f, -0.5f, -0.5f, 
+
+            -0.5f, -0.5f,  0.5f, 
+            0.5f, -0.5f,  0.5f,  
+            0.5f,  0.5f,  0.5f,  
+            0.5f,  0.5f,  0.5f,  
+            -0.5f,  0.5f,  0.5f, 
+            -0.5f, -0.5f,  0.5f, 
+
+            -0.5f,  0.5f,  0.5f, 
+            -0.5f,  0.5f, -0.5f, 
+            -0.5f, -0.5f, -0.5f, 
+            -0.5f, -0.5f, -0.5f, 
+            -0.5f, -0.5f,  0.5f, 
+            -0.5f,  0.5f,  0.5f, 
+
+            0.5f,  0.5f,  0.5f,  
+            0.5f,  0.5f, -0.5f,  
+            0.5f, -0.5f, -0.5f,  
+            0.5f, -0.5f, -0.5f,  
+            0.5f, -0.5f,  0.5f,  
+            0.5f,  0.5f,  0.5f,  
+
+            -0.5f, -0.5f, -0.5f, 
+            0.5f, -0.5f, -0.5f,  
+            0.5f, -0.5f,  0.5f,  
+            0.5f, -0.5f,  0.5f,  
+            -0.5f, -0.5f,  0.5f, 
+            -0.5f, -0.5f, -0.5f, 
+
+            -0.5f,  0.5f, -0.5f, 
+            0.5f,  0.5f, -0.5f,  
+            0.5f,  0.5f,  0.5f,  
+            0.5f,  0.5f,  0.5f,  
+            -0.5f,  0.5f,  0.5f, 
+            -0.5f,  0.5f, -0.5f, 
+        };
+
+        std::array<float, 216> blandVertsNormals = {
+        -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+         0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+         0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+         0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+        -0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+        -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+
+        -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+         0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+         0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+         0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+        -0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+        -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+
+        -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
+        -0.5f,  0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+        -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+        -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+        -0.5f, -0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
+        -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
+
+         0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
+         0.5f,  0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+         0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+         0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+         0.5f, -0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
+         0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
+
+        -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
+         0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
+         0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+         0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+        -0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+        -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
+
+        -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
+         0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
+         0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
+         0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
+        -0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
+        -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f
+    };
 
         std::array<unsigned int, 36> cubeIndices = {
             // Front face
