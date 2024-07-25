@@ -28,8 +28,8 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
 
-const unsigned int SCR_WIDTH = 1600;
-const unsigned int SCR_HEIGHT = 1200;
+const unsigned int SCR_WIDTH = 2400;
+const unsigned int SCR_HEIGHT = 1800;
 
 bool cursorDisabled = true;
 bool justPressed = false;
@@ -50,11 +50,25 @@ glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
 // imgui variables
 bool rotateModels = true;
 float spinSpeed = 0.0f;
-float lightIntensity = 0.1f;
+float flashlightIntensity = 1.0f;
+float directionLightIntensity = 1.0f;
+float pointLightIntensity = 1.0f;
 bool show_another_window = false;
 ImVec4 clear_color = ImVec4(0.0f, 0.0f, 0.0f, 1.00f);
 bool useDiffuse = true;
 bool useSpecular = true;
+bool useAmbient = true;
+bool useFlashlight = true;
+bool useDirectionalLight = true;
+bool usePointLight = true;
+
+// positions of the point lights
+glm::vec3 pointLightPositions[] = {
+    glm::vec3( 0.7f,  0.2f,  2.0f),
+    glm::vec3( 2.3f, -3.3f, -4.0f),
+    glm::vec3(-4.0f,  2.0f, -12.0f),
+    glm::vec3( 0.0f,  0.0f, -3.0f)
+};
 
 int main () {
     glfwInit();
@@ -88,7 +102,7 @@ int main () {
 
     // loading shaders
     Shader objectShader("../src/shaders/shader.vert", "../src/shaders/shader.frag");
-    Shader lightingShader("../src/shaders/lighting.vert", "../src/shaders/lighting.frag");
+    Shader pointlightcube("../src/shaders/pointlightcube.vert", "../src/shaders/pointlightcube.frag");
 
     // primitve helper
     PrimitiveHelper ph;
@@ -99,22 +113,35 @@ int main () {
     glGenBuffers(1, &VBO);
 
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(ph.blandVertsNormals), ph.blandVertsNormals.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(ph.blandVertsNormalsTex), ph.blandVertsNormalsTex.data(), GL_STATIC_DRAW);
     glBindVertexArray(objectVAO);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1); 
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+    glEnableVertexAttribArray(2);
 
     glGenVertexArrays(1, &lightVAO);
     glBindVertexArray(lightVAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0); 
 
     // 4. unbind the buffers and vertex array
     glBindBuffer(GL_ARRAY_BUFFER, 0); 
     glBindVertexArray(0); 
+
+
+    unsigned int diffuseMapCrate = texHelp.bindTexture("../textures/crate.png");
+    unsigned int specularMapCrate = texHelp.bindTexture("../textures/crate_specular.png");
+
+    unsigned int diffuseMapFloor = texHelp.bindTexture("../textures/gray.png");
+    unsigned int specularMapFloor = texHelp.bindTexture("../textures/gray.png");
+
+    objectShader.use();
+    objectShader.setInt("material.diffuse", 0);
+    objectShader.setInt("material.specular", 1);
 
     // Initialize ImGui
     IMGUI_CHECKVERSION();
@@ -147,41 +174,134 @@ int main () {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         objectShader.use();
-        objectShader.setVec3("objectColor", 1.0f, 0.5f, 0.31f);
-        objectShader.setVec3("lightColor",  1.0f, 1.0f, 1.0f);
-        objectShader.setVec3("lightPos", lightPos); 
-        objectShader.setVec3("viewPos", camera.Position); 
+        // be sure to activate shader when setting uniforms/drawing objects
+        objectShader.setVec3("viewPos", camera.Position);
+        objectShader.setFloat("material.shininess", 32.0f);
+
+        /*
+           Here we set all the uniforms for the 5/6 types of lights we have. We have to set them manually and index 
+           the proper PointLight struct in the array to set each uniform variable. This can be done more code-friendly
+           by defining light types as classes and set their values in there, or by using a more efficient uniform approach
+           by using 'Uniform buffer objects', but that is something we'll discuss in the 'Advanced GLSL' tutorial.
+        */
+        // directional light
+        objectShader.setVec3("dirLight.direction", -0.2f, -1.0f, -0.3f);
+        objectShader.setVec3("dirLight.ambient", 0.05f, 0.05f, 0.05f);
+        objectShader.setVec3("dirLight.diffuse", 0.4f, 0.4f, 0.4f);
+        objectShader.setVec3("dirLight.specular", 0.5f, 0.5f, 0.5f);
+        // point light 1
+        objectShader.setVec3("pointLights[0].position", pointLightPositions[0]);
+        objectShader.setVec3("pointLights[0].ambient", 0.05f, 0.05f, 0.05f);
+        objectShader.setVec3("pointLights[0].diffuse", 0.8f, 0.8f, 0.8f);
+        objectShader.setVec3("pointLights[0].specular", 1.0f, 1.0f, 1.0f);
+        objectShader.setFloat("pointLights[0].constant", 1.0f);
+        objectShader.setFloat("pointLights[0].linear", 0.09f);
+        objectShader.setFloat("pointLights[0].quadratic", 0.032f);
+        // point light 2
+        objectShader.setVec3("pointLights[1].position", pointLightPositions[1]);
+        objectShader.setVec3("pointLights[1].ambient", 0.05f, 0.05f, 0.05f);
+        objectShader.setVec3("pointLights[1].diffuse", 0.8f, 0.8f, 0.8f);
+        objectShader.setVec3("pointLights[1].specular", 1.0f, 1.0f, 1.0f);
+        objectShader.setFloat("pointLights[1].constant", 1.0f);
+        objectShader.setFloat("pointLights[1].linear", 0.09f);
+        objectShader.setFloat("pointLights[1].quadratic", 0.032f);
+        // point light 3
+        objectShader.setVec3("pointLights[2].position", pointLightPositions[2]);
+        objectShader.setVec3("pointLights[2].ambient", 0.05f, 0.05f, 0.05f);
+        objectShader.setVec3("pointLights[2].diffuse", 0.8f, 0.8f, 0.8f);
+        objectShader.setVec3("pointLights[2].specular", 1.0f, 1.0f, 1.0f);
+        objectShader.setFloat("pointLights[2].constant", 1.0f);
+        objectShader.setFloat("pointLights[2].linear", 0.09f);
+        objectShader.setFloat("pointLights[2].quadratic", 0.032f);
+        // point light 4
+        objectShader.setVec3("pointLights[3].position", pointLightPositions[3]);
+        objectShader.setVec3("pointLights[3].ambient", 0.05f, 0.05f, 0.05f);
+        objectShader.setVec3("pointLights[3].diffuse", 0.8f, 0.8f, 0.8f);
+        objectShader.setVec3("pointLights[3].specular", 1.0f, 1.0f, 1.0f);
+        objectShader.setFloat("pointLights[3].constant", 1.0f);
+        objectShader.setFloat("pointLights[3].linear", 0.09f);
+        objectShader.setFloat("pointLights[3].quadratic", 0.032f);
+        // spotLight
+        objectShader.setVec3("spotLight.position", camera.Position);
+        objectShader.setVec3("spotLight.direction", camera.Front);
+        objectShader.setVec3("spotLight.ambient", 0.0f, 0.0f, 0.0f);
+        objectShader.setVec3("spotLight.diffuse", 1.0f, 1.0f, 1.0f);
+        objectShader.setVec3("spotLight.specular", 1.0f, 1.0f, 1.0f);
+        objectShader.setFloat("spotLight.constant", 1.0f);
+        objectShader.setFloat("spotLight.linear", 0.09f);
+        objectShader.setFloat("spotLight.quadratic", 0.032f);
+        objectShader.setFloat("spotLight.cutOff", glm::cos(glm::radians(12.5f)));
+        objectShader.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(15.0f)));
+
+        // custom uniforms
+        objectShader.setBool("useAmbient", useAmbient);
         objectShader.setBool("useDiffuse", useDiffuse);
         objectShader.setBool("useSpecular", useSpecular);
-        objectShader.setFloat("lightIntensity", lightIntensity);
+        objectShader.setBool("useFlashlight", useFlashlight);
+        objectShader.setBool("useDirectionalLight", useDirectionalLight);
+        objectShader.setBool("usePointLight", usePointLight);
+        objectShader.setFloat("flashlightIntensity", flashlightIntensity);
+        objectShader.setFloat("directionalLightIntensity", directionLightIntensity);
+        objectShader.setFloat("pointLightIntensity", pointLightIntensity);
 
+        // setting the object transform
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         glm::mat4 view = camera.GetViewMatrix();
         objectShader.setMat4("projection", projection);
         objectShader.setMat4("view", view);
-        glm::mat4 model = glm::mat4(1.0f);
-        if(rotateModels) {
-            model = glm::rotate(model, (float)glfwGetTime() * glm::radians(spinSpeed), glm::vec3(0.0f, 1.0f, 0.0f));  // rotate the models
-        }
-        objectShader.setMat4("model", model);
 
-        // render the cube
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, diffuseMapCrate);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, specularMapCrate);
+
+        for(int i = 0; i < 10; i++) {
+            glm::mat4 model = glm::mat4(1.0f);
+            model = glm::translate(model, ph.cubePositions[i]);
+            float angle = 20.0f * i;
+            if(rotateModels && spinSpeed > 0.0f) {
+                model = glm::rotate(model, (float)glfwGetTime() * glm::radians(spinSpeed), glm::vec3(0.0f, 1.0f, 0.0f));  // rotate the models
+            } else {
+                model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
+            }
+            objectShader.setMat4("model", model);
+            glBindVertexArray(objectVAO);
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+        }
+
+        // bind diffuse map
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, diffuseMapFloor);
+        // bind specular map
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, specularMapFloor);
+
+        //floor
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::scale(model, glm::vec3(50.0f, 0.1, 50.0f));
+        model = glm::translate(model, glm::vec3(0.0f, -40.0f, 0.0f));
+        objectShader.setMat4("model", model);
+        objectShader.setFloat("material.shininess", 64.0f);
+        // render the floor
         glBindVertexArray(objectVAO);
         glDrawArrays(GL_TRIANGLES, 0, 36);
 
 
-        // also draw the lamp object
-        lightingShader.use();
-        lightingShader.setMat4("projection", projection);
-        lightingShader.setMat4("view", view);
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, lightPos);
-        model = glm::scale(model, glm::vec3(0.2f)); // a smaller cube
-        lightingShader.setMat4("model", model);
+        // draw the lamp object
+        pointlightcube.use();
+        pointlightcube.setMat4("projection", projection);
+        pointlightcube.setMat4("view", view);
 
-        // render the light
+
         glBindVertexArray(lightVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
+        for (unsigned int i = 0; i < 4; i++)
+        {
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, pointLightPositions[i]);
+            model = glm::scale(model, glm::vec3(0.2f)); // Make it a smaller cube
+            pointlightcube.setMat4("model", model);
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+        }
 
 
         // IMGUI BUTTONS
@@ -193,18 +313,24 @@ int main () {
 
             ImGui::Text("Debug controls");       
             ImGui::Checkbox("Rotate Models?", &rotateModels);
+            ImGui::Checkbox("Use Ambient?", &useAmbient);
             ImGui::Checkbox("Use Diffuse?", &useDiffuse);  
-            ImGui::Checkbox("Use Specular?", &useSpecular);    
+            ImGui::Checkbox("Use Specular?", &useSpecular);  
+            ImGui::Checkbox("Use Flashlight?", &useFlashlight);
+            ImGui::Checkbox("Use Directional Light?", &useDirectionalLight); 
+            ImGui::Checkbox("Use Point Light?", &usePointLight); 
 
             ImGui::SliderFloat("Rotation Speed", &spinSpeed, 0.0f, 500.0f);
             ImGui::ColorEdit3("clear color", (float*)&clear_color);
 
-            ImGui::SliderFloat("Lighting Intensity", &lightIntensity, 0.1f, 1.0f);
+            ImGui::SliderFloat("Flashlight Intensity", &flashlightIntensity, 0.0f, 4.0f);
+            ImGui::SliderFloat("Pointlight Intensity", &pointLightIntensity, 0.0f, 4.0f);
+            ImGui::SliderFloat("Directional Light Intensity", &directionLightIntensity, 0.0f, 4.0f);
 
-            if (ImGui::Button("Button"))
-                counter++;
-            ImGui::SameLine();
-            ImGui::Text("counter = %d", counter);
+            //if (ImGui::Button("Button"))
+            //    counter++;
+            //ImGui::SameLine();
+            //ImGui::Text("counter = %d", counter);
 
 
             if (ImGui::Button("Close Application"))
