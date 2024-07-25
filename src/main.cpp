@@ -21,7 +21,7 @@
 #include "Shader.hpp"
 #include "Camera.hpp"
 #include "PrimitiveHelper.hpp"
-#include "Texture.hpp"
+#include "Model.hpp"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
@@ -97,51 +97,27 @@ int main () {
     // z buffer
     glEnable(GL_DEPTH_TEST);
 
-    // texture helper
-    Texture texHelp;
-
     // loading shaders
     Shader objectShader("../src/shaders/shader.vert", "../src/shaders/shader.frag");
     Shader pointlightcube("../src/shaders/pointlightcube.vert", "../src/shaders/pointlightcube.frag");
+
+    // load models
+    Model ourModel("../models/stormtrooper.obj");
 
     // primitve helper
     PrimitiveHelper ph;
 
     // bind
-    unsigned int VBO, objectVAO, lightVAO;
-    glGenVertexArrays(1, &objectVAO);
+    unsigned int VBO, lightVAO;
     glGenBuffers(1, &VBO);
-
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(ph.blandVertsNormalsTex), ph.blandVertsNormalsTex.data(), GL_STATIC_DRAW);
-    glBindVertexArray(objectVAO);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1); 
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
-    glEnableVertexAttribArray(2);
 
     glGenVertexArrays(1, &lightVAO);
     glBindVertexArray(lightVAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0); 
-
-    // 4. unbind the buffers and vertex array
-    glBindBuffer(GL_ARRAY_BUFFER, 0); 
-    glBindVertexArray(0); 
-
-
-    unsigned int diffuseMapCrate = texHelp.bindTexture("../textures/crate.png");
-    unsigned int specularMapCrate = texHelp.bindTexture("../textures/crate_specular.png");
-
-    unsigned int diffuseMapFloor = texHelp.bindTexture("../textures/gray.png");
-    unsigned int specularMapFloor = texHelp.bindTexture("../textures/gray.png");
-
-    objectShader.use();
-    objectShader.setInt("material.diffuse", 0);
-    objectShader.setInt("material.specular", 1);
 
     // Initialize ImGui
     IMGUI_CHECKVERSION();
@@ -178,12 +154,6 @@ int main () {
         objectShader.setVec3("viewPos", camera.Position);
         objectShader.setFloat("material.shininess", 32.0f);
 
-        /*
-           Here we set all the uniforms for the 5/6 types of lights we have. We have to set them manually and index 
-           the proper PointLight struct in the array to set each uniform variable. This can be done more code-friendly
-           by defining light types as classes and set their values in there, or by using a more efficient uniform approach
-           by using 'Uniform buffer objects', but that is something we'll discuss in the 'Advanced GLSL' tutorial.
-        */
         // directional light
         objectShader.setVec3("dirLight.direction", -0.2f, -1.0f, -0.3f);
         objectShader.setVec3("dirLight.ambient", 0.05f, 0.05f, 0.05f);
@@ -250,48 +220,18 @@ int main () {
         objectShader.setMat4("projection", projection);
         objectShader.setMat4("view", view);
 
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, diffuseMapCrate);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, specularMapCrate);
-
-        for(int i = 0; i < 10; i++) {
-            glm::mat4 model = glm::mat4(1.0f);
-            model = glm::translate(model, ph.cubePositions[i]);
-            float angle = 20.0f * i;
-            if(rotateModels && spinSpeed > 0.0f) {
-                model = glm::rotate(model, (float)glfwGetTime() * glm::radians(spinSpeed), glm::vec3(0.0f, 1.0f, 0.0f));  // rotate the models
-            } else {
-                model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-            }
-            objectShader.setMat4("model", model);
-            glBindVertexArray(objectVAO);
-            glDrawArrays(GL_TRIANGLES, 0, 36);
-        }
-
-        // bind diffuse map
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, diffuseMapFloor);
-        // bind specular map
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, specularMapFloor);
-
-        //floor
+        // render the loaded model
         glm::mat4 model = glm::mat4(1.0f);
-        model = glm::scale(model, glm::vec3(50.0f, 0.1, 50.0f));
-        model = glm::translate(model, glm::vec3(0.0f, -40.0f, 0.0f));
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f)); // translate it down so it's at the center of the scene
+        model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));	// it's a bit too big for our scene, so scale it down
         objectShader.setMat4("model", model);
-        objectShader.setFloat("material.shininess", 64.0f);
-        // render the floor
-        glBindVertexArray(objectVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
+        ourModel.Draw(objectShader);
 
 
         // draw the lamp object
         pointlightcube.use();
         pointlightcube.setMat4("projection", projection);
         pointlightcube.setMat4("view", view);
-
 
         glBindVertexArray(lightVAO);
         for (unsigned int i = 0; i < 4; i++)
@@ -350,7 +290,6 @@ int main () {
     }
 
     // cleaning up after ourselves
-    glDeleteVertexArrays(1, &objectVAO);
     glDeleteVertexArrays(1, &lightVAO);
     glDeleteBuffers(1, &VBO);
     ImGui_ImplOpenGL3_Shutdown();

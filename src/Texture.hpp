@@ -7,7 +7,7 @@
 
 class Texture {
     public:
-        unsigned int bindTexture(char const * path){
+        unsigned int bindTexture(char const* path){
             unsigned int textureID;
             glGenTextures(1, &textureID);
 
