@@ -1,0 +1,107 @@
+# Blender 4.1.1 MTL File: '77826.blend'
+# www.blender.org
+
+newmtl 1_-_Default
+Ns 422.499969
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 3
+map_Kd Helmet_baseColor.png
+map_Bump -bm 1.000000 Helmet_normal.png
+
+newmtl 2_-_Default
+Ns 422.499969
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 3
+map_Kd 2_-_Default_baseColor.png
+
+newmtl 4_-_Default
+Ns 422.499969
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 3
+map_Kd 4_-_Default_baseColor.png
+
+newmtl 5_-_Default
+Ns 422.499969
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 3
+map_Kd 5_-_Default_baseColor.png
+map_Bump -bm 1.000000 5_-_Default_normal.png
+
+newmtl 6_-_Default
+Ns 422.499969
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 3
+map_Kd 6_-_Default_baseColor.png
+
+newmtl 7_-_Default
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd 7_-_Default_baseColor.png
+
+newmtl 8_-_Default
+Ns 39.999996
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Rubber_joints_baseColor.png
+map_Bump -bm 1.000000 Rubber_joints_normal.png
+
+newmtl Helmet
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Helmet_baseColor.png
+map_Bump -bm 1.000000 Helmet_normal.png
+
+newmtl NST_15_-_Default
+Ns 62.500000
+Ka 0.570000 0.570000 0.570000
+Kd 0.021808 0.021808 0.021808
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 3
+
+newmtl Rubber_joints
+Ns 39.999996
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd Rubber_joints_baseColor.png
+map_Bump -bm 1.000000 Rubber_joints_normal.png

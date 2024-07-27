@@ -1,6 +1,6 @@
-CFLAGS = -std=c++17 -O3
+CFLAGS = -std=c++20
 LDFLAGSLINUX = -lglfw -lGL -lX11 -lpthread -lXrandr -lXi -ldl -lassimp
-LDFLAGSWINDOWS = -lglfw3 -lopengl32 -lgdi32 -limm32 -lassimp-vc143-mt
+LDFLAGSWINDOWS = -lglfw3 -lopengl32 -lgdi32 -limm32 -lz -lassimp
 
 buildlinux:
 	g++ $(CFLAGS) -I ../include -L ../lib -o opengl ../src/*.cpp ../src/*.c ../include/imGui/*.cpp $(LDFLAGSLINUX)

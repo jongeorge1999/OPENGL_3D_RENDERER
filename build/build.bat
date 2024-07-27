@@ -1,2 +1,2 @@
-mingw32-make buildwindows
+mingw32-make.exe buildwindows
 opengl.exe

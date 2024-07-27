@@ -17,6 +17,7 @@
 #include <sstream>
 #include <string>
 #include <cstring>
+#include <format>
 
 #include "Shader.hpp"
 #include "Camera.hpp"
@@ -65,9 +66,9 @@ bool usePointLight = true;
 // positions of the point lights
 glm::vec3 pointLightPositions[] = {
     glm::vec3( 0.7f,  0.2f,  2.0f),
-    glm::vec3( 2.3f, -3.3f, -4.0f),
+    glm::vec3( 2.3f, 3.3f, -4.0f),
     glm::vec3(-4.0f,  2.0f, -12.0f),
-    glm::vec3( 0.0f,  0.0f, -3.0f)
+    glm::vec3( -5.0f,  0.0f, -5.0f)
 };
 
 int main () {
@@ -94,6 +95,8 @@ int main () {
         return -1;
     }
 
+    stbi_set_flip_vertically_on_load(true);
+
     // z buffer
     glEnable(GL_DEPTH_TEST);
 
@@ -102,7 +105,9 @@ int main () {
     Shader pointlightcube("../src/shaders/pointlightcube.vert", "../src/shaders/pointlightcube.frag");
 
     // load models
-    Model ourModel("../models/stormtrooper.obj");
+    Model backpack_obj("../models/backpack/backpack.obj");
+    Model stormtrooper_obj("../models/stormtrooper/stormtrooper.obj");
+    Model wood_floor_obj("../models/wood_floor/wood_floor.obj");
 
     // primitve helper
     PrimitiveHelper ph;
@@ -161,16 +166,16 @@ int main () {
         objectShader.setVec3("dirLight.specular", 0.5f, 0.5f, 0.5f);
         // point light 1
         objectShader.setVec3("pointLights[0].position", pointLightPositions[0]);
-        objectShader.setVec3("pointLights[0].ambient", 0.05f, 0.05f, 0.05f);
-        objectShader.setVec3("pointLights[0].diffuse", 0.8f, 0.8f, 0.8f);
+        objectShader.setVec3("pointLights[0].ambient", 0.05f, 0.00f, 0.00f);
+        objectShader.setVec3("pointLights[0].diffuse", 1.0f, 0.0f, 0.0f);
         objectShader.setVec3("pointLights[0].specular", 1.0f, 1.0f, 1.0f);
         objectShader.setFloat("pointLights[0].constant", 1.0f);
         objectShader.setFloat("pointLights[0].linear", 0.09f);
         objectShader.setFloat("pointLights[0].quadratic", 0.032f);
         // point light 2
         objectShader.setVec3("pointLights[1].position", pointLightPositions[1]);
-        objectShader.setVec3("pointLights[1].ambient", 0.05f, 0.05f, 0.05f);
-        objectShader.setVec3("pointLights[1].diffuse", 0.8f, 0.8f, 0.8f);
+        objectShader.setVec3("pointLights[1].ambient", 0.00f, 0.00f, 0.05f);
+        objectShader.setVec3("pointLights[1].diffuse", 0.0f, 0.0f, 1.0f);
         objectShader.setVec3("pointLights[1].specular", 1.0f, 1.0f, 1.0f);
         objectShader.setFloat("pointLights[1].constant", 1.0f);
         objectShader.setFloat("pointLights[1].linear", 0.09f);
@@ -185,9 +190,9 @@ int main () {
         objectShader.setFloat("pointLights[2].quadratic", 0.032f);
         // point light 4
         objectShader.setVec3("pointLights[3].position", pointLightPositions[3]);
-        objectShader.setVec3("pointLights[3].ambient", 0.05f, 0.05f, 0.05f);
-        objectShader.setVec3("pointLights[3].diffuse", 0.8f, 0.8f, 0.8f);
-        objectShader.setVec3("pointLights[3].specular", 1.0f, 1.0f, 1.0f);
+        objectShader.setVec3("pointLights[3].ambient", 0.00f, 0.05f, 0.00f);
+        objectShader.setVec3("pointLights[3].diffuse", 0.0f, 1.0f, 0.0f);
+        objectShader.setVec3("pointLights[3].specular", 0.0f, 1.0f, 0.0f);
         objectShader.setFloat("pointLights[3].constant", 1.0f);
         objectShader.setFloat("pointLights[3].linear", 0.09f);
         objectShader.setFloat("pointLights[3].quadratic", 0.032f);
@@ -222,10 +227,24 @@ int main () {
 
         // render the loaded model
         glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f)); // translate it down so it's at the center of the scene
-        model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));	// it's a bit too big for our scene, so scale it down
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, -2.0f)); // translate it down so it's at the center of the scene
+        model = glm::scale(model, glm::vec3(0.5f));	// it's a bit too big for our scene, so scale it down
         objectShader.setMat4("model", model);
-        ourModel.Draw(objectShader);
+        backpack_obj.Draw(objectShader);
+
+        // render the loaded stormtrooper model
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 1.0f)); // translate it down so it's at the center of the scene
+        model = glm::scale(model, glm::vec3(1.0f));	// it's a bit too big for our scene, so scale it down
+        objectShader.setMat4("model", model);
+        stormtrooper_obj.Draw(objectShader);
+
+        // render the loaded floor model
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0f, -1.0f, 0.0f)); // translate it down so it's at the center of the scene
+        model = glm::scale(model, glm::vec3(1.0f));	// it's a bit too big for our scene, so scale it down
+        objectShader.setMat4("model", model);
+        wood_floor_obj.Draw(objectShader);
 
 
         // draw the lamp object
@@ -236,6 +255,12 @@ int main () {
         glBindVertexArray(lightVAO);
         for (unsigned int i = 0; i < 4; i++)
         {
+            std::string formatString = std::format("pointLights[{}].diffuse", i);
+            const char* glString = formatString.c_str();
+            unsigned int uniformLocation = glGetUniformLocation(objectShader.ID, glString);
+            glm::vec3 val;
+            glGetUniformfv(objectShader.ID, uniformLocation, glm::value_ptr(val));
+            pointlightcube.setVec3("color", val);
             model = glm::mat4(1.0f);
             model = glm::translate(model, pointLightPositions[i]);
             model = glm::scale(model, glm::vec3(0.2f)); // Make it a smaller cube
