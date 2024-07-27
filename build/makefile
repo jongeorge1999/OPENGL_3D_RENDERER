@@ -9,4 +9,4 @@ buildwindows:
 	g++ $(CFLAGS) -I ../include -L ../lib -o opengl ../src/*.cpp ../src/*.c ../include/imGui/*.cpp $(LDFLAGSWINDOWS)
 
 clean:
-	rm vulkan vulkan.exe
+	rm opengl opengl.exe

@@ -168,7 +168,7 @@ int main () {
         objectShader.setVec3("pointLights[0].position", pointLightPositions[0]);
         objectShader.setVec3("pointLights[0].ambient", 0.05f, 0.00f, 0.00f);
         objectShader.setVec3("pointLights[0].diffuse", 1.0f, 0.0f, 0.0f);
-        objectShader.setVec3("pointLights[0].specular", 1.0f, 1.0f, 1.0f);
+        objectShader.setVec3("pointLights[0].specular", 1.0f, 0.7f, 0.7f);
         objectShader.setFloat("pointLights[0].constant", 1.0f);
         objectShader.setFloat("pointLights[0].linear", 0.09f);
         objectShader.setFloat("pointLights[0].quadratic", 0.032f);
@@ -176,7 +176,7 @@ int main () {
         objectShader.setVec3("pointLights[1].position", pointLightPositions[1]);
         objectShader.setVec3("pointLights[1].ambient", 0.00f, 0.00f, 0.05f);
         objectShader.setVec3("pointLights[1].diffuse", 0.0f, 0.0f, 1.0f);
-        objectShader.setVec3("pointLights[1].specular", 1.0f, 1.0f, 1.0f);
+        objectShader.setVec3("pointLights[1].specular", 0.7f, 0.7f, 1.0f);
         objectShader.setFloat("pointLights[1].constant", 1.0f);
         objectShader.setFloat("pointLights[1].linear", 0.09f);
         objectShader.setFloat("pointLights[1].quadratic", 0.032f);
@@ -192,7 +192,7 @@ int main () {
         objectShader.setVec3("pointLights[3].position", pointLightPositions[3]);
         objectShader.setVec3("pointLights[3].ambient", 0.00f, 0.05f, 0.00f);
         objectShader.setVec3("pointLights[3].diffuse", 0.0f, 1.0f, 0.0f);
-        objectShader.setVec3("pointLights[3].specular", 0.0f, 1.0f, 0.0f);
+        objectShader.setVec3("pointLights[3].specular", 0.7f, 1.0f, 0.7f);
         objectShader.setFloat("pointLights[3].constant", 1.0f);
         objectShader.setFloat("pointLights[3].linear", 0.09f);
         objectShader.setFloat("pointLights[3].quadratic", 0.032f);
@@ -227,22 +227,25 @@ int main () {
 
         // render the loaded model
         glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f, 0.0f, -2.0f)); // translate it down so it's at the center of the scene
-        model = glm::scale(model, glm::vec3(0.5f));	// it's a bit too big for our scene, so scale it down
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, -2.0f));
+        model = glm::scale(model, glm::vec3(0.5f));
         objectShader.setMat4("model", model);
         backpack_obj.Draw(objectShader);
 
         // render the loaded stormtrooper model
         model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 1.0f)); // translate it down so it's at the center of the scene
-        model = glm::scale(model, glm::vec3(1.0f));	// it's a bit too big for our scene, so scale it down
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 1.0f));
+        model = glm::scale(model, glm::vec3(1.0f));
+        if(rotateModels) {
+            model = glm::rotate(model, (float)glfwGetTime() * glm::radians(spinSpeed), glm::vec3(0.0f, 1.0f, 0.0f));  // rotate the models
+        }
         objectShader.setMat4("model", model);
         stormtrooper_obj.Draw(objectShader);
 
         // render the loaded floor model
         model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f, -1.0f, 0.0f)); // translate it down so it's at the center of the scene
-        model = glm::scale(model, glm::vec3(1.0f));	// it's a bit too big for our scene, so scale it down
+        model = glm::translate(model, glm::vec3(0.0f, -1.0f, 0.0f));
+        model = glm::scale(model, glm::vec3(1.0f));	
         objectShader.setMat4("model", model);
         wood_floor_obj.Draw(objectShader);
 
