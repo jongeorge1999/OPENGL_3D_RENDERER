@@ -62,6 +62,17 @@ uniform bool useFlashlight;
 uniform bool useDirectionalLight;
 uniform bool usePointLight;
 
+//depth testing
+uniform bool showDepthBuffer;
+float near = 0.1;
+float far = 100.0;
+
+float LinearizeDepth(float depth) {
+    float z = depth * 2.0 - 1.0;
+    return (2.0 * near * far) / (far + near - z * (far - near));
+}
+
+//light intensity
 uniform float flashlightIntensity;
 uniform float directionalLightIntensity;
 uniform float pointLightIntensity;
@@ -92,7 +103,12 @@ void main() {
         result += CalcSpotLight(spotLight, norm, FragPos, viewDir) * flashlightIntensity;
     }
     
-    FragColor = vec4(result, 1.0);
+    if (!showDepthBuffer) {
+        FragColor = vec4(result, 1.0);
+    } else {
+        float depth = LinearizeDepth(gl_FragCoord.z) / far;
+        FragColor = vec4(vec3(depth), 1.0);
+    }
 }
 
 // calculates the color when using a directional light.

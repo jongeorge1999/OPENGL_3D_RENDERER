@@ -1,5 +1,6 @@
 #pragma once
 #include <array>
+#include <vector>
 
         // update the uniform color
         //int vertexColorLocation = glGetUniformLocation(shaders.ID, "uniformColor");
@@ -17,6 +18,37 @@
 class PrimitiveHelper {
     public:
         PrimitiveHelper(){}
+
+        std::array<float, 30> grassVerts = {
+            // positions         // texture Coords
+            0.0f,  0.5f,  0.0f,  0.0f,  1.0f,
+            0.0f, -0.5f,  0.0f,  0.0f,  0.0f,
+            1.0f, -0.5f,  0.0f,  1.0f,  0.0f,
+
+            0.0f,  0.5f,  0.0f,  0.0f,  1.0f,
+            1.0f, -0.5f,  0.0f,  1.0f,  0.0f,
+            1.0f,  0.5f,  0.0f,  1.0f,  1.0f
+        };
+
+
+        // transparent vegetation locations
+        std::vector<glm::vec3> vegetation {
+            glm::vec3(-3.5f, -0.4f, -4.48f),
+            glm::vec3( 3.5f, -0.4f, 4.51f),
+            glm::vec3( 1.0f, -0.4f, 4.7f),
+            glm::vec3(-1.3f, -0.4f, -3.3f),
+            glm::vec3 (6.5f, -0.4f, -5.6f)
+        };
+
+        std::array<float, 30> transparentVertices = {
+            0.0f,  0.5f,  0.0f,  0.0f,  0.0f,
+            0.0f, -0.5f,  0.0f,  0.0f,  1.0f,
+            1.0f, -0.5f,  0.0f,  1.0f,  1.0f,
+
+            0.0f,  0.5f,  0.0f,  0.0f,  0.0f,
+            1.0f, -0.5f,  0.0f,  1.0f,  1.0f,
+            1.0f,  0.5f,  0.0f,  1.0f,  0.0f
+        };
 
         std::array<glm::vec3, 10> cubePositions = {
             glm::vec3( 0.0f,  0.0f,  0.0f), 

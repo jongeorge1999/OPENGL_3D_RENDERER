@@ -18,6 +18,7 @@
 #include <string>
 #include <cstring>
 #include <format>
+#include <filesystem>
 
 #include "Shader.hpp"
 #include "Camera.hpp"
@@ -25,6 +26,7 @@
 #include "Model.hpp"
 #include "SceneReader.hpp"
 #include "Controller.hpp"
+#include "TexLoader.hpp"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
@@ -33,6 +35,8 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 const unsigned int SCR_WIDTH = 2400;
 const unsigned int SCR_HEIGHT = 1800;
 
+//Tex loader
+TexLoader tl;
 
 // primitve helper
 PrimitiveHelper ph;
@@ -65,9 +69,10 @@ bool show_another_window = false;
 bool useDiffuse = true;
 bool useSpecular = true;
 bool useAmbient = true;
-bool useFlashlight = true;
+bool useFlashlight = false;
 bool useDirectionalLight = true;
 bool usePointLight = true;
+bool showDepthBuffer = false;
 float spinSpeed = 0.0f;
 float flashlightIntensity = 1.0f;
 float directionLightIntensity = 1.0f;
@@ -106,14 +111,28 @@ int main () {
     // z buffer
     glEnable(GL_DEPTH_TEST);
 
+    //stencil testing
+    glEnable(GL_STENCIL_TEST);
+
+    //blending
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
     // loading shaders
     Shader objectShader("../src/shaders/shader.vert", "../src/shaders/shader.frag");
     Shader pointlightcube("../src/shaders/pointlightcube.vert", "../src/shaders/pointlightcube.frag");
+    Shader transparentShader("../src/shaders/transparent.vert", "../src/shaders/transparent.frag");
+    Shader grassShader("../src/shaders/grass.vert", "../src/shaders/grass.frag");
 
     // load models
     Model backpack_obj("../models/backpack/backpack.obj");
     Model stormtrooper_obj("../models/stormtrooper/stormtrooper.obj");
     Model wood_floor_obj("../models/wood_floor/wood_floor.obj");
+
+
+    //load textures
+    unsigned int transparentTexture = tl.loadTexture("../textures/blending_transparent_window.png");
+    unsigned int grassTexture = tl.loadTexture("../textures/grass.png");
 
     // bind buffers and VAOs
     unsigned int VBO, lightVAO;
@@ -127,6 +146,32 @@ int main () {
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0); 
 
+    //transparent
+    unsigned int transparentVAO, transparentVBO;
+    glGenVertexArrays(1, &transparentVAO);
+    glGenBuffers(1, &transparentVBO);
+    glBindVertexArray(transparentVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, transparentVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(ph.transparentVertices), ph.transparentVertices.data(), GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+    glBindVertexArray(0);
+
+    //grass
+    unsigned int grassVAO, grassVBO;
+    glGenVertexArrays(1, &grassVAO);
+    glGenBuffers(1, &grassVBO);
+    glBindVertexArray(grassVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, grassVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(ph.grassVerts), ph.grassVerts.data(), GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+    glBindVertexArray(0);
+
     // Initialize ImGui
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -139,11 +184,19 @@ int main () {
     //**************************************************************************************************************************** 
     // MAIN LOOP
     while(!glfwWindowShouldClose(window)) {
-
         //delta time
         float currentFrame = static_cast<float>(glfwGetTime());
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
+
+
+        // sort the transparent windows before rendering
+        vector<glm::vec3> windows = sr.getWindows();
+        std::map<float, glm::vec3> sorted;
+        for (unsigned int i = 0; i < windows.size(); i++) {
+            float distance = glm::length(camera.Position - windows[i]);
+            sorted[distance] = windows[i];
+        }
 
         //input
         controller.processInput(window, deltaTime, &camera);
@@ -153,10 +206,11 @@ int main () {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        // clear the color buffer
+        // clear the buffers
         glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
+        //do objects first
         objectShader.use();
 
         // doing a lot of the work in the scene reader
@@ -169,6 +223,7 @@ int main () {
         objectShader.setBool("useFlashlight", useFlashlight);
         objectShader.setBool("useDirectionalLight", useDirectionalLight);
         objectShader.setBool("usePointLight", usePointLight);
+        objectShader.setBool("showDepthBuffer", showDepthBuffer);
         objectShader.setFloat("flashlightIntensity", flashlightIntensity);
         objectShader.setFloat("directionalLightIntensity", directionLightIntensity);
         objectShader.setFloat("pointLightIntensity", pointLightIntensity);
@@ -202,12 +257,10 @@ int main () {
         wood_floor_obj.Draw(objectShader);
 
 
-        // draw the lamp object
+        // change to using the pointLightcube shader
         pointlightcube.use();
         pointlightcube.setMat4("projection", projection);
         pointlightcube.setMat4("view", view);
-
-        // bind the lightVAO
         glBindVertexArray(lightVAO);
         glm::vec3* pointLights = sr.getpointLights();
 
@@ -221,6 +274,41 @@ int main () {
             model = glm::scale(model, glm::vec3(0.2f));
             pointlightcube.setMat4("model", model);
             glDrawArrays(GL_TRIANGLES, 0, 36);
+        }
+
+        // switch to the grass shader
+        grassShader.use();
+        grassShader.setMat4("projection", projection);
+        grassShader.setMat4("view", view);
+        grassShader.setInt("texture1", 0);
+        glBindVertexArray(grassVAO);
+        glBindTexture(GL_TEXTURE_2D, grassTexture);
+
+        // vegetation
+        vector<glm::vec3> vegetation = ph.vegetation;
+        for (unsigned int i = 0; i < vegetation.size(); i++)
+        {
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, vegetation[i]);
+            grassShader.setMat4("model", model);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+        }
+
+
+        // switch to the transparency shader
+        transparentShader.use();
+        transparentShader.setMat4("projection", projection);
+        transparentShader.setMat4("view", view);
+        transparentShader.setInt("texture1", 0);
+        glBindVertexArray(transparentVAO);
+        glBindTexture(GL_TEXTURE_2D, transparentTexture);
+
+        // draw all the windows from furthest to nearest
+        for (std::map<float, glm::vec3>::reverse_iterator it = sorted.rbegin(); it != sorted.rend(); ++it) {
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, it->second);
+            transparentShader.setMat4("model", model);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
         }
 
 
@@ -239,6 +327,7 @@ int main () {
             ImGui::Checkbox("Use Flashlight?", &useFlashlight);
             ImGui::Checkbox("Use Directional Light?", &useDirectionalLight); 
             ImGui::Checkbox("Use Point Light?", &usePointLight); 
+            ImGui::Checkbox("Show depth buffer?", &showDepthBuffer);
 
             ImGui::SliderFloat("Rotation Speed", &spinSpeed, 0.0f, 500.0f);
             ImGui::ColorEdit3("clear color", (float*)&clear_color);

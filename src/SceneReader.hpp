@@ -17,6 +17,15 @@ class SceneReader {
             glm::vec3( -5.0f,  0.0f, -5.0f)
         };
 
+        // transparent window locations
+        vector<glm::vec3> windows {
+            glm::vec3(-1.5f, 0.0f, -0.48f),
+            glm::vec3( 1.5f, 0.0f, 0.51f),
+            glm::vec3( 0.0f, 0.0f, 0.7f),
+            glm::vec3(-0.3f, 0.0f, -2.3f),
+            glm::vec3( 0.5f, 0.0f, -0.6f)
+        };
+
     public:
         SceneReader(){}
         void setParams(Shader objectShader, Camera camera) {
@@ -76,4 +85,5 @@ class SceneReader {
         }
 
         glm::vec3* getpointLights() { return pointLightPositions; }
+        vector<glm::vec3> getWindows() { return windows; }
 };
