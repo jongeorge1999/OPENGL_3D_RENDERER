@@ -84,6 +84,7 @@ float spinSpeed = 0.0f;
 float flashlightIntensity = 1.0f;
 float directionLightIntensity = 1.0f;
 float pointLightIntensity = 1.0f;
+unsigned int currSkybox = 0;
 
 //main function
 int main () {
@@ -136,6 +137,8 @@ int main () {
     Shader transparentShader("../src/shaders/transparent.vert", "../src/shaders/transparent.frag");
     Shader grassShader("../src/shaders/grass.vert", "../src/shaders/grass.frag");
     Shader screenShader("../src/shaders/screenBuffer.vert", "../src/shaders/screenBuffer.frag");
+    Shader skyboxShader("../src/shaders/skybox.vert", "../src/shaders/skybox.frag");
+    Shader reflectiveShader("../src/shaders/reflectiveCubemap.vert", "../src/shaders/reflectiveCubemap.frag");
 
     // load models
     Model backpack_obj("../models/backpack/backpack.obj");
@@ -146,6 +149,30 @@ int main () {
     //load textures
     unsigned int transparentTexture = tl.loadTexture("../textures/red_window.png");
     unsigned int grassTexture = tl.loadTexture("../textures/grass.png");
+
+    //skybox-day texture
+    vector<std::string> faces_day
+    {
+        "../textures/skybox_day/right.jpg",
+        "../textures/skybox_day/left.jpg",
+        "../textures/skybox_day/top.jpg",
+        "../textures/skybox_day/bottom.jpg",
+        "../textures/skybox_day/front.jpg",
+        "../textures/skybox_day/back.jpg"
+    };
+    unsigned int cubemapTextureDay = tl.loadCubemap(faces_day);
+
+    //skybox-night texture
+    vector<std::string> faces_night
+    {
+        "../textures/skybox_night/right.jpg",
+        "../textures/skybox_night/left.jpg",
+        "../textures/skybox_night/top.jpg",
+        "../textures/skybox_night/bottom.jpg",
+        "../textures/skybox_night/front.jpg",
+        "../textures/skybox_night/back.jpg"
+    };
+    unsigned int cubemapTextureNight = tl.loadCubemap(faces_night);
 
     // bind buffers and VAOs
     unsigned int VBO, lightVAO;
@@ -197,6 +224,17 @@ int main () {
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+
+
+     // skybox VAO
+    unsigned int skyboxVAO, skyboxVBO;
+    glGenVertexArrays(1, &skyboxVAO);
+    glGenBuffers(1, &skyboxVBO);
+    glBindVertexArray(skyboxVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, skyboxVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(ph.skyboxVertices), ph.skyboxVertices.data(), GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 
 
     // framebuffer configuration
@@ -360,6 +398,32 @@ int main () {
             glDrawArrays(GL_TRIANGLES, 0, 6);
         }
 
+        //render reflective stormtrooper model
+        reflectiveShader.use();
+        reflectiveShader.setMat4("projection", projection);
+        reflectiveShader.setMat4("view", view);
+        reflectiveShader.setInt("texture1", 0);
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0f, 4.0f, -6.0f));
+        if(rotateModels) { model = glm::rotate(model, (float)glfwGetTime() * glm::radians(spinSpeed), glm::vec3(0.0f, 1.0f, 0.0f)); }
+        model = glm::scale(model, glm::vec3(0.5f));
+        reflectiveShader.setMat4("model", model);
+        stormtrooper_obj.Draw(reflectiveShader);
+
+        // draw skybox (LAST)
+        glDepthFunc(GL_LEQUAL);  // change depth function so depth test passes when values are equal to depth buffer's content
+        skyboxShader.use();
+        //view = glm::mat4(glm::mat3(camera.GetViewMatrix())); // remove translation from the view matrix
+        skyboxShader.setMat4("view", glm::mat4(glm::mat3(camera.GetViewMatrix())));
+        skyboxShader.setMat4("projection", projection);
+        // skybox cube
+        glBindVertexArray(skyboxVAO);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, currSkybox);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        glBindVertexArray(0);
+        glDepthFunc(GL_LESS); // set depth function back to default
+
 
         // switch to the transparency shader
         transparentShader.use();
@@ -429,6 +493,21 @@ int main () {
             ImGui::SliderFloat("Flashlight Intensity", &flashlightIntensity, 0.0f, 4.0f);
             ImGui::SliderFloat("Pointlight Intensity", &pointLightIntensity, 0.0f, 4.0f);
             ImGui::SliderFloat("Directional Light Intensity", &directionLightIntensity, 0.0f, 4.0f);
+
+
+            static const char* items[]{"Day","Night"};
+            static int Selecteditem = 0;
+            if (ImGui::Combo("Skybox Selector", &Selecteditem, items, IM_ARRAYSIZE(items)))
+            {
+                // Here event is fired
+                if(Selecteditem == 0) {
+                    //set skybox to day
+                    currSkybox = cubemapTextureDay;
+                } else if(Selecteditem == 1) {
+                    //set skybox to night
+                    currSkybox = cubemapTextureNight;
+                }
+            }
 
             //if (ImGui::Button("Button"))
             //    counter++;
