@@ -23,22 +23,32 @@
 #include "Camera.hpp"
 #include "PrimitiveHelper.hpp"
 #include "Model.hpp"
+#include "SceneReader.hpp"
+#include "Controller.hpp"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
-void processInput(GLFWwindow* window);
 
 const unsigned int SCR_WIDTH = 2400;
 const unsigned int SCR_HEIGHT = 1800;
 
-bool cursorDisabled = true;
-bool justPressed = false;
+
+// primitve helper
+PrimitiveHelper ph;
+
+//scene reader
+SceneReader sr;
+
+//controller
+Controller controller;
 
 // camera
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
+bool cursorDisabled = true;
+bool justPressed = false;
 bool firstMouse = true;
 
 // timing
@@ -49,28 +59,21 @@ float lastFrame = 0.0f;
 glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
 
 // imgui variables
-bool rotateModels = true;
-float spinSpeed = 0.0f;
-float flashlightIntensity = 1.0f;
-float directionLightIntensity = 1.0f;
-float pointLightIntensity = 1.0f;
-bool show_another_window = false;
 ImVec4 clear_color = ImVec4(0.0f, 0.0f, 0.0f, 1.00f);
+bool rotateModels = true;
+bool show_another_window = false;
 bool useDiffuse = true;
 bool useSpecular = true;
 bool useAmbient = true;
 bool useFlashlight = true;
 bool useDirectionalLight = true;
 bool usePointLight = true;
+float spinSpeed = 0.0f;
+float flashlightIntensity = 1.0f;
+float directionLightIntensity = 1.0f;
+float pointLightIntensity = 1.0f;
 
-// positions of the point lights
-glm::vec3 pointLightPositions[] = {
-    glm::vec3( 0.7f,  0.2f,  2.0f),
-    glm::vec3( 2.3f, 3.3f, -4.0f),
-    glm::vec3(-4.0f,  2.0f, -12.0f),
-    glm::vec3( -5.0f,  0.0f, -5.0f)
-};
-
+//main function
 int main () {
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -78,6 +81,7 @@ int main () {
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 
+    //create the window
     GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "OPENGL 3D RENDERER", NULL, NULL);
     if (window == NULL) {
         std::cout << "Failed to create GLFW window" << std::endl;
@@ -90,11 +94,13 @@ int main () {
     glfwSetScrollCallback(window, scroll_callback); 
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
+    //init glad
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
         std::cout << "Failed to initialize GLAD" << std::endl;
         return -1;
     }
 
+    //texture flip
     stbi_set_flip_vertically_on_load(true);
 
     // z buffer
@@ -109,10 +115,7 @@ int main () {
     Model stormtrooper_obj("../models/stormtrooper/stormtrooper.obj");
     Model wood_floor_obj("../models/wood_floor/wood_floor.obj");
 
-    // primitve helper
-    PrimitiveHelper ph;
-
-    // bind
+    // bind buffers and VAOs
     unsigned int VBO, lightVAO;
     glGenBuffers(1, &VBO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
@@ -143,7 +146,7 @@ int main () {
         lastFrame = currentFrame;
 
         //input
-        processInput(window);
+        controller.processInput(window, deltaTime, &camera);
 
         // imgui
         ImGui_ImplOpenGL3_NewFrame();
@@ -155,60 +158,11 @@ int main () {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         objectShader.use();
-        // be sure to activate shader when setting uniforms/drawing objects
-        objectShader.setVec3("viewPos", camera.Position);
-        objectShader.setFloat("material.shininess", 32.0f);
 
-        // directional light
-        objectShader.setVec3("dirLight.direction", -0.2f, -1.0f, -0.3f);
-        objectShader.setVec3("dirLight.ambient", 0.05f, 0.05f, 0.05f);
-        objectShader.setVec3("dirLight.diffuse", 0.4f, 0.4f, 0.4f);
-        objectShader.setVec3("dirLight.specular", 0.5f, 0.5f, 0.5f);
-        // point light 1
-        objectShader.setVec3("pointLights[0].position", pointLightPositions[0]);
-        objectShader.setVec3("pointLights[0].ambient", 0.05f, 0.00f, 0.00f);
-        objectShader.setVec3("pointLights[0].diffuse", 1.0f, 0.0f, 0.0f);
-        objectShader.setVec3("pointLights[0].specular", 1.0f, 0.7f, 0.7f);
-        objectShader.setFloat("pointLights[0].constant", 1.0f);
-        objectShader.setFloat("pointLights[0].linear", 0.09f);
-        objectShader.setFloat("pointLights[0].quadratic", 0.032f);
-        // point light 2
-        objectShader.setVec3("pointLights[1].position", pointLightPositions[1]);
-        objectShader.setVec3("pointLights[1].ambient", 0.00f, 0.00f, 0.05f);
-        objectShader.setVec3("pointLights[1].diffuse", 0.0f, 0.0f, 1.0f);
-        objectShader.setVec3("pointLights[1].specular", 0.7f, 0.7f, 1.0f);
-        objectShader.setFloat("pointLights[1].constant", 1.0f);
-        objectShader.setFloat("pointLights[1].linear", 0.09f);
-        objectShader.setFloat("pointLights[1].quadratic", 0.032f);
-        // point light 3
-        objectShader.setVec3("pointLights[2].position", pointLightPositions[2]);
-        objectShader.setVec3("pointLights[2].ambient", 0.05f, 0.05f, 0.05f);
-        objectShader.setVec3("pointLights[2].diffuse", 0.8f, 0.8f, 0.8f);
-        objectShader.setVec3("pointLights[2].specular", 1.0f, 1.0f, 1.0f);
-        objectShader.setFloat("pointLights[2].constant", 1.0f);
-        objectShader.setFloat("pointLights[2].linear", 0.09f);
-        objectShader.setFloat("pointLights[2].quadratic", 0.032f);
-        // point light 4
-        objectShader.setVec3("pointLights[3].position", pointLightPositions[3]);
-        objectShader.setVec3("pointLights[3].ambient", 0.00f, 0.05f, 0.00f);
-        objectShader.setVec3("pointLights[3].diffuse", 0.0f, 1.0f, 0.0f);
-        objectShader.setVec3("pointLights[3].specular", 0.7f, 1.0f, 0.7f);
-        objectShader.setFloat("pointLights[3].constant", 1.0f);
-        objectShader.setFloat("pointLights[3].linear", 0.09f);
-        objectShader.setFloat("pointLights[3].quadratic", 0.032f);
-        // spotLight
-        objectShader.setVec3("spotLight.position", camera.Position);
-        objectShader.setVec3("spotLight.direction", camera.Front);
-        objectShader.setVec3("spotLight.ambient", 0.0f, 0.0f, 0.0f);
-        objectShader.setVec3("spotLight.diffuse", 1.0f, 1.0f, 1.0f);
-        objectShader.setVec3("spotLight.specular", 1.0f, 1.0f, 1.0f);
-        objectShader.setFloat("spotLight.constant", 1.0f);
-        objectShader.setFloat("spotLight.linear", 0.09f);
-        objectShader.setFloat("spotLight.quadratic", 0.032f);
-        objectShader.setFloat("spotLight.cutOff", glm::cos(glm::radians(12.5f)));
-        objectShader.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(15.0f)));
-
-        // custom uniforms
+        // doing a lot of the work in the scene reader
+        sr.setParams(objectShader, camera);
+        
+        // imgui uniforms
         objectShader.setBool("useAmbient", useAmbient);
         objectShader.setBool("useDiffuse", useDiffuse);
         objectShader.setBool("useSpecular", useSpecular);
@@ -218,14 +172,14 @@ int main () {
         objectShader.setFloat("flashlightIntensity", flashlightIntensity);
         objectShader.setFloat("directionalLightIntensity", directionLightIntensity);
         objectShader.setFloat("pointLightIntensity", pointLightIntensity);
-
+       
         // setting the object transform
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         glm::mat4 view = camera.GetViewMatrix();
         objectShader.setMat4("projection", projection);
         objectShader.setMat4("view", view);
 
-        // render the loaded model
+        // render the loaded backpack model
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::translate(model, glm::vec3(0.0f, 0.0f, -2.0f));
         model = glm::scale(model, glm::vec3(0.5f));
@@ -236,9 +190,7 @@ int main () {
         model = glm::mat4(1.0f);
         model = glm::translate(model, glm::vec3(0.0f, 0.0f, 1.0f));
         model = glm::scale(model, glm::vec3(1.0f));
-        if(rotateModels) {
-            model = glm::rotate(model, (float)glfwGetTime() * glm::radians(spinSpeed), glm::vec3(0.0f, 1.0f, 0.0f));  // rotate the models
-        }
+        if(rotateModels) { model = glm::rotate(model, (float)glfwGetTime() * glm::radians(spinSpeed), glm::vec3(0.0f, 1.0f, 0.0f)); }
         objectShader.setMat4("model", model);
         stormtrooper_obj.Draw(objectShader);
 
@@ -255,18 +207,18 @@ int main () {
         pointlightcube.setMat4("projection", projection);
         pointlightcube.setMat4("view", view);
 
+        // bind the lightVAO
         glBindVertexArray(lightVAO);
-        for (unsigned int i = 0; i < 4; i++)
-        {
-            std::string formatString = std::format("pointLights[{}].diffuse", i);
-            const char* glString = formatString.c_str();
-            unsigned int uniformLocation = glGetUniformLocation(objectShader.ID, glString);
+        glm::vec3* pointLights = sr.getpointLights();
+
+        // draw all the lamp objects for every light with correct color
+        for (unsigned int i = 0; i < 4; i++) {
             glm::vec3 val;
-            glGetUniformfv(objectShader.ID, uniformLocation, glm::value_ptr(val));
+            glGetUniformfv(objectShader.ID, glGetUniformLocation(objectShader.ID, std::format("pointLights[{}].diffuse", i).c_str()), glm::value_ptr(val));
             pointlightcube.setVec3("color", val);
             model = glm::mat4(1.0f);
-            model = glm::translate(model, pointLightPositions[i]);
-            model = glm::scale(model, glm::vec3(0.2f)); // Make it a smaller cube
+            model = glm::translate(model, pointLights[i]);
+            model = glm::scale(model, glm::vec3(0.2f));
             pointlightcube.setMat4("model", model);
             glDrawArrays(GL_TRIANGLES, 0, 36);
         }
@@ -277,7 +229,7 @@ int main () {
 
             static int counter = 0;
 
-            ImGui::Begin("Georges Debug Menu");            
+            ImGui::Begin("George Engine Debug Menu");            
 
             ImGui::Text("Debug controls");       
             ImGui::Checkbox("Rotate Models?", &rotateModels);
@@ -306,11 +258,12 @@ int main () {
 
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
             ImGui::End();
-        }
 
-        // render the imgui window
-        ImGui::Render();
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+            // render the imgui window
+            ImGui::Render();
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        }
 
         // swap chain and IO handling
         glfwSwapBuffers(window);
@@ -328,36 +281,10 @@ int main () {
 }
 
 
+//CALLBACKS AND MOUSE CONTROL
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
 } 
-
-void processInput(GLFWwindow *window) {
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS && !cursorDisabled && !justPressed) {
-        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-        justPressed = true;
-        cursorDisabled = true;
-    } else if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS && cursorDisabled && !justPressed) {
-        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-        justPressed = true;
-        cursorDisabled = false;
-    }
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        camera.ProcessKeyboard(FORWARD, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        camera.ProcessKeyboard(BACKWARD, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        camera.ProcessKeyboard(LEFT, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        camera.ProcessKeyboard(RIGHT, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
-        camera.ProcessKeyboard(UP, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
-        camera.ProcessKeyboard(DOWN, deltaTime);
-
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_RELEASE)
-        justPressed = false;
-}
 
 void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
     float xpos = static_cast<float>(xposIn);
@@ -375,7 +302,7 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
     lastX = xpos;
     lastY = ypos;
 
-    if(cursorDisabled) {
+    if(controller.isCursorDisabled()) {
         camera.ProcessMouseMovement(xoffset, yoffset);
     } else {
         camera.ProcessMouseMovement(0, 0);
