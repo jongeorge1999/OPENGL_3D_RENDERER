@@ -73,6 +73,13 @@ bool useFlashlight = false;
 bool useDirectionalLight = true;
 bool usePointLight = true;
 bool showDepthBuffer = false;
+bool wireFrame = false;
+bool renderToTexture = true;
+bool inverted = false;
+bool grayscale = false;
+bool sharpen = false;
+bool blur = false;
+bool edgeDetection = false;
 float spinSpeed = 0.0f;
 float flashlightIntensity = 1.0f;
 float directionLightIntensity = 1.0f;
@@ -118,11 +125,17 @@ int main () {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+    //face culling
+    glEnable(GL_CULL_FACE);  
+    glCullFace(GL_BACK); 
+    glFrontFace(GL_CCW); 
+
     // loading shaders
     Shader objectShader("../src/shaders/shader.vert", "../src/shaders/shader.frag");
     Shader pointlightcube("../src/shaders/pointlightcube.vert", "../src/shaders/pointlightcube.frag");
     Shader transparentShader("../src/shaders/transparent.vert", "../src/shaders/transparent.frag");
     Shader grassShader("../src/shaders/grass.vert", "../src/shaders/grass.frag");
+    Shader screenShader("../src/shaders/screenBuffer.vert", "../src/shaders/screenBuffer.frag");
 
     // load models
     Model backpack_obj("../models/backpack/backpack.obj");
@@ -131,7 +144,7 @@ int main () {
 
 
     //load textures
-    unsigned int transparentTexture = tl.loadTexture("../textures/blending_transparent_window.png");
+    unsigned int transparentTexture = tl.loadTexture("../textures/red_window.png");
     unsigned int grassTexture = tl.loadTexture("../textures/grass.png");
 
     // bind buffers and VAOs
@@ -172,6 +185,43 @@ int main () {
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
     glBindVertexArray(0);
 
+
+    // screen quad VAO
+    unsigned int quadVAO, quadVBO;
+    glGenVertexArrays(1, &quadVAO);
+    glGenBuffers(1, &quadVBO);
+    glBindVertexArray(quadVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(ph.quadVertices), ph.quadVertices.data(), GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+
+
+    // framebuffer configuration
+    unsigned int framebuffer;
+    glGenFramebuffers(1, &framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+    // create a color attachment texture
+    unsigned int textureColorbuffer;
+    glGenTextures(1, &textureColorbuffer);
+    glBindTexture(GL_TEXTURE_2D, textureColorbuffer);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureColorbuffer, 0);
+    // create a renderbuffer object for depth and stencil attachment (we won't be sampling these)
+    unsigned int rbo;
+    glGenRenderbuffers(1, &rbo);
+    glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT); // use a single renderbuffer object for both a depth AND stencil buffer.
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo); // now actually attach it
+    // now that we actually created the framebuffer and added all attachments we want to check if it is actually complete now
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << endl;
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
     // Initialize ImGui
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -184,6 +234,14 @@ int main () {
     //**************************************************************************************************************************** 
     // MAIN LOOP
     while(!glfwWindowShouldClose(window)) {
+
+        if (wireFrame) {
+            // draw as wireframe
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        } else {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        }
+
         //delta time
         float currentFrame = static_cast<float>(glfwGetTime());
         deltaTime = currentFrame - lastFrame;
@@ -206,12 +264,20 @@ int main () {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
+        if(renderToTexture) {
+            glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+            glEnable(GL_DEPTH_TEST); // enable depth testing (is disabled for rendering screen-space quad)
+        }
+
         // clear the buffers
         glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
         //do objects first
         objectShader.use();
+
+        // screenShader.use();
+        // screenShader.setInt("screenTexture", 0);
 
         // doing a lot of the work in the scene reader
         sr.setParams(objectShader, camera);
@@ -256,6 +322,8 @@ int main () {
         objectShader.setMat4("model", model);
         wood_floor_obj.Draw(objectShader);
 
+        //disable face culling for transparent objects
+        glDisable(GL_CULL_FACE);
 
         // change to using the pointLightcube shader
         pointlightcube.use();
@@ -263,7 +331,6 @@ int main () {
         pointlightcube.setMat4("view", view);
         glBindVertexArray(lightVAO);
         glm::vec3* pointLights = sr.getpointLights();
-
         // draw all the lamp objects for every light with correct color
         for (unsigned int i = 0; i < 4; i++) {
             glm::vec3 val;
@@ -283,9 +350,8 @@ int main () {
         grassShader.setInt("texture1", 0);
         glBindVertexArray(grassVAO);
         glBindTexture(GL_TEXTURE_2D, grassTexture);
-
-        // vegetation
-        vector<glm::vec3> vegetation = ph.vegetation;
+        // draw vegetation
+        vector<glm::vec3> vegetation = sr.getVegetation();
         for (unsigned int i = 0; i < vegetation.size(); i++)
         {
             model = glm::mat4(1.0f);
@@ -302,7 +368,6 @@ int main () {
         transparentShader.setInt("texture1", 0);
         glBindVertexArray(transparentVAO);
         glBindTexture(GL_TEXTURE_2D, transparentTexture);
-
         // draw all the windows from furthest to nearest
         for (std::map<float, glm::vec3>::reverse_iterator it = sorted.rbegin(); it != sorted.rend(); ++it) {
             model = glm::mat4(1.0f);
@@ -311,6 +376,28 @@ int main () {
             glDrawArrays(GL_TRIANGLES, 0, 6);
         }
 
+        if(renderToTexture) {
+            // now bind back to default framebuffer and draw a quad plane with the attached framebuffer color texture
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glDisable(GL_DEPTH_TEST); // disable depth test so screen-space quad isn't discarded due to depth test.
+            // clear all relevant buffers
+            glClearColor(1.0f, 1.0f, 1.0f, 1.0f); // set clear color to white (not really necessary actually, since we won't be able to see behind the quad anyways)
+            glClear(GL_COLOR_BUFFER_BIT);
+
+            screenShader.use();
+            screenShader.setBool("inverted", inverted);
+            screenShader.setBool("grayscale", grayscale);
+            screenShader.setBool("sharpen", sharpen);
+            screenShader.setBool("blur", blur);
+            screenShader.setBool("edgeDetection", edgeDetection);
+            glBindVertexArray(quadVAO);
+            glBindTexture(GL_TEXTURE_2D, textureColorbuffer);	// use the color attachment texture as the texture of the quad plane
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+        } else {
+            glEnable(GL_DEPTH_TEST); // RE-ENABLE if not rendering to texture
+        }
+
+         
 
         // IMGUI BUTTONS
         {
@@ -328,6 +415,13 @@ int main () {
             ImGui::Checkbox("Use Directional Light?", &useDirectionalLight); 
             ImGui::Checkbox("Use Point Light?", &usePointLight); 
             ImGui::Checkbox("Show depth buffer?", &showDepthBuffer);
+            ImGui::Checkbox("wireframe?", &wireFrame);
+            ImGui::Checkbox("Render to texture?", &renderToTexture);
+            ImGui::Checkbox("invert?", &inverted);
+            ImGui::Checkbox("grayscale?", &grayscale);
+            ImGui::Checkbox("sharpen?", &sharpen);
+            ImGui::Checkbox("blur?", &blur);
+            ImGui::Checkbox("edge detection?", &edgeDetection);
 
             ImGui::SliderFloat("Rotation Speed", &spinSpeed, 0.0f, 500.0f);
             ImGui::ColorEdit3("clear color", (float*)&clear_color);
@@ -361,7 +455,15 @@ int main () {
 
     // cleaning up after ourselves
     glDeleteVertexArrays(1, &lightVAO);
+    glDeleteVertexArrays(1, &quadVAO);
+    glDeleteVertexArrays(1, &grassVAO);
+    glDeleteVertexArrays(1, &transparentVAO);
     glDeleteBuffers(1, &VBO);
+    glDeleteBuffers(1, &quadVBO);
+    glDeleteBuffers(1, &grassVBO);
+    glDeleteBuffers(1, &transparentVBO);
+    glDeleteRenderbuffers(1, &rbo);
+    glDeleteFramebuffers(1, &framebuffer);
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();

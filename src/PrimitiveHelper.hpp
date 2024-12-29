@@ -30,16 +30,6 @@ class PrimitiveHelper {
             1.0f,  0.5f,  0.0f,  1.0f,  1.0f
         };
 
-
-        // transparent vegetation locations
-        std::vector<glm::vec3> vegetation {
-            glm::vec3(-3.5f, -0.4f, -4.48f),
-            glm::vec3( 3.5f, -0.4f, 4.51f),
-            glm::vec3( 1.0f, -0.4f, 4.7f),
-            glm::vec3(-1.3f, -0.4f, -3.3f),
-            glm::vec3 (6.5f, -0.4f, -5.6f)
-        };
-
         std::array<float, 30> transparentVertices = {
             0.0f,  0.5f,  0.0f,  0.0f,  0.0f,
             0.0f, -0.5f,  0.0f,  0.0f,  1.0f,
@@ -61,6 +51,17 @@ class PrimitiveHelper {
             glm::vec3( 1.5f,  2.0f, -2.5f), 
             glm::vec3( 1.5f,  0.2f, -1.5f), 
             glm::vec3(-1.3f,  1.0f, -1.5f) 
+        };
+
+        std::array<float, 24> quadVertices = { // vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates.
+            // positions   // texCoords
+            -1.0f,  1.0f,  0.0f, 1.0f,
+            -1.0f, -1.0f,  0.0f, 0.0f,
+            1.0f, -1.0f,  1.0f, 0.0f,
+
+            -1.0f,  1.0f,  0.0f, 1.0f,
+            1.0f, -1.0f,  1.0f, 0.0f,
+            1.0f,  1.0f,  1.0f, 1.0f
         };
     
         std::array<float, 288> cubeVerts = {
