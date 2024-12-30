@@ -41,7 +41,7 @@ const unsigned int SCR_HEIGHT = 1800;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
-// lighting
+// directional light position
 glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
 
 // imgui variables
@@ -241,11 +241,8 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         ImGui::NewFrame();
 
         // wireframe
-        if (wireFrame) {
-            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        } else {
-            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        }
+        if (wireFrame) { glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); }
+        else { glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); }
 
         // sort the transparent windows
         vector<glm::vec3> windows = sr.getWindows();
@@ -256,10 +253,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         }
 
         // render to screen or to texture
-        if(renderToTexture) {
-            glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-            glEnable(GL_DEPTH_TEST);
-        }
+        if(renderToTexture) { glBindFramebuffer(GL_FRAMEBUFFER, framebuffer); glEnable(GL_DEPTH_TEST); }
 
         // clear the buffers
         glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
@@ -447,11 +441,8 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             if (ImGui::Combo("Skybox Selector", &Selecteditem, items, IM_ARRAYSIZE(items)))
             {
                 // Here event is fired
-                if(Selecteditem == 0) {
-                    currSkybox = cubemapTextureDay; //set skybox to day
-                } else if(Selecteditem == 1) {
-                    currSkybox = cubemapTextureNight; //set skybox to night
-                }
+                if(Selecteditem == 0) { currSkybox = cubemapTextureDay; }
+                else if(Selecteditem == 1) { currSkybox = cubemapTextureNight; }
             }
 
             //if (ImGui::Button("Button"))
