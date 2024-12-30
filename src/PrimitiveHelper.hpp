@@ -2,22 +2,10 @@
 #include <array>
 #include <vector>
 
-        // update the uniform color
-        //int vertexColorLocation = glGetUniformLocation(shaders.ID, "uniformColor");
-        //float greenage = (glm::sin(glfwGetTime()) + 1.0f) / 2.0f;
-        //glUniform4f(vertexColorLocation, 1.0f, greenage, 1.0f, 1.0f);
-
-        // uniform transformations
-        //glm::mat4 trans = glm::mat4(1.0f);
-        //trans = glm::translate(trans, glm::vec3(0.0f, -0.0f, 0.0f));
-        //trans = glm::rotate(trans, (float)glfwGetTime(), glm::vec3(0.0f, 0.0f, 1.0f));
-        //trans = glm::scale(trans, glm::vec3((glm::sin(glfwGetTime()) + 1.5f) / 2.0f, (glm::sin(glfwGetTime()) + 1.5f) / 2.0f, 1.0f));
-        //unsigned int transformLoc = glGetUniformLocation(shaders.ID, "transform");
-        //glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(trans));
-
 class PrimitiveHelper {
     public:
         PrimitiveHelper(){}
+        ~PrimitiveHelper(){}
 
         std::array<float, 30> grassVerts = {
             // positions         // texture Coords
@@ -53,9 +41,7 @@ class PrimitiveHelper {
             glm::vec3(-1.3f,  1.0f, -1.5f) 
         };
 
-        std::array<float, 108> skyboxVertices = {
-            // positions          
-            // positions          
+        std::array<float, 108> skyboxVertices = {        
             -1.0f,  1.0f, -1.0f,
             -1.0f, -1.0f, -1.0f,
             1.0f, -1.0f, -1.0f,
@@ -99,7 +85,8 @@ class PrimitiveHelper {
             1.0f, -1.0f,  1.0f
         };
 
-        std::array<float, 24> quadVertices = { // vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates.
+        //render to texture quad
+        std::array<float, 24> quadVertices = { 
             // positions   // texCoords
             -1.0f,  1.0f,  0.0f, 1.0f,
             -1.0f, -1.0f,  0.0f, 0.0f,

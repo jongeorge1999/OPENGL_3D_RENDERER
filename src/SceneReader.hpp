@@ -7,7 +7,7 @@
 #include "Shader.hpp"
 #include "Camera.hpp"
 
-class SceneReader {
+class SceneReader {    
     private:
         // positions of the point lights
         glm::vec3 pointLightPositions[4] = {
@@ -37,6 +37,7 @@ class SceneReader {
 
     public:
         SceneReader(){}
+        ~SceneReader(){}
         void setParams(Shader objectShader, Camera camera) {
 
             // be sure to activate shader when setting uniforms/drawing objects

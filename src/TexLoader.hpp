@@ -18,18 +18,16 @@
 class TexLoader {
     public:
         TexLoader() {}
+        ~TexLoader() {}
 
         // utility function for loading a 2D texture from file
-        // ---------------------------------------------------
-        unsigned int loadTexture(char const * path)
-        {
+        unsigned int loadTexture(char const * path) {
             unsigned int textureID;
             glGenTextures(1, &textureID);
 
             int width, height, nrComponents;
             unsigned char *data = stbi_load(path, &width, &height, &nrComponents, 0);
-            if (data)
-            {
+            if (data) {
                 GLenum format;
                 if (nrComponents == 1)
                     format = GL_RED;
@@ -48,9 +46,7 @@ class TexLoader {
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
                 stbi_image_free(data);
-            }
-            else
-            {
+            } else {
                 std::cout << "Texture failed to load at path: " << path << std::endl;
                 stbi_image_free(data);
             }
@@ -66,25 +62,19 @@ class TexLoader {
         // -Y (bottom)
         // +Z (front) 
         // -Z (back)
-        // -------------------------------------------------------
-        unsigned int loadCubemap(vector<std::string> faces)
-        {
+        unsigned int loadCubemap(vector<std::string> faces) {
             stbi_set_flip_vertically_on_load(false);
             unsigned int textureID;
             glGenTextures(1, &textureID);
             glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
 
             int width, height, nrChannels;
-            for (unsigned int i = 0; i < faces.size(); i++)
-            {
+            for (unsigned int i = 0; i < faces.size(); i++) {
                 unsigned char *data = stbi_load(faces[i].c_str(), &width, &height, &nrChannels, 0);
-                if (data)
-                {
+                if (data) {
                     glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
                     stbi_image_free(data);
-                }
-                else
-                {
+                } else {
                     std::cout << "Cubemap texture failed to load at path: " << faces[i] << std::endl;
                     stbi_image_free(data);
                 }
