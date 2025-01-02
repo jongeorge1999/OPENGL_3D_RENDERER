@@ -17,83 +17,37 @@
 #include <string>
 #include <cstring>
 #include <format>
-#include <filesystem>
 
 #include "Renderer.hpp"
 #include "Model.hpp"
-#include "SceneReader.hpp"
-#include "TexLoader.hpp"
-#include "PrimitiveHelper.hpp"
 #include "Shader.hpp"
-#include "Object.hpp"
-
-//Texture loader
-TexLoader tl;
-
-// primitve helper
-PrimitiveHelper ph;
-
-//scene reader
-SceneReader sr;
-
-//creating game objects
-Object st;
-
-//screen width and height
-const unsigned int SCR_WIDTH = 2400;
-const unsigned int SCR_HEIGHT = 1800;
-
-// timing
-float deltaTime = 0.0f;
-float lastFrame = 0.0f;
-
-// directional light position
-glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
-
-// imgui variables
-ImVec4 clear_color = ImVec4(0.0f, 0.0f, 0.0f, 1.00f);
-bool rotateModels = true;
-bool show_another_window = false;
-bool useDiffuse = true;
-bool useSpecular = true;
-bool useAmbient = true;
-bool useFlashlight = false;
-bool useDirectionalLight = true;
-bool usePointLight = true;
-bool showDepthBuffer = false;
-bool wireFrame = false;
-bool renderToTexture = true;
-bool inverted = false;
-bool grayscale = false;
-bool sharpen = false;
-bool blur = false;
-bool edgeDetection = false;
-float spinSpeed = 0.0f;
-float flashlightIntensity = 1.0f;
-float directionLightIntensity = 1.0f;
-float pointLightIntensity = 1.0f;
-unsigned int currSkybox = 0;
 
 void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller) {
+    //create game objects
+    Object stormtrooper("Stormtrooper");
+    Object backpack("backpack", glm::vec3(0.0f, 2.0f, 5.0f), glm::vec3(0.5f));
+    Object floor("floor", glm::vec3(0.0f, -1.0f, 0.0f));
+    Object reflectiveST("Reflective ST", glm::vec3(2.0f, 0.0f, 2.0f));
+
+    //organize game objects
+    objects.push_back(&stormtrooper);
+    objects.push_back(&backpack);
+    objects.push_back(&floor);
+    objects.push_back(&reflectiveST);
+
     //texture flip
     stbi_set_flip_vertically_on_load(true);
 
-    // z buffer
+    // GL settings
     glEnable(GL_DEPTH_TEST);
-
-    //stencil testing
     glEnable(GL_STENCIL_TEST);
-
-    //blending
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-    //face culling
     glEnable(GL_CULL_FACE);  
     glCullFace(GL_BACK); 
     glFrontFace(GL_CCW); 
 
-    // loading shaders
+    // load shaders
     Shader objectShader("../src/shaders/shader.vert", "../src/shaders/shader.frag");
     Shader pointlightcube("../src/shaders/pointlightcube.vert", "../src/shaders/pointlightcube.frag");
     Shader transparentShader("../src/shaders/transparent.vert", "../src/shaders/transparent.frag");
@@ -108,54 +62,26 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     Model stormtrooper_obj("../models/stormtrooper/stormtrooper.obj");
     Model wood_floor_obj("../models/wood_floor/wood_floor.obj");
 
-
     //load textures
     unsigned int transparentTexture = tl.loadTexture("../textures/red_window.png");
     unsigned int grassTexture = tl.loadTexture("../textures/grass.png");
 
-    //skybox-day texture
-    vector<std::string> faces_day
-    {
-        "../textures/skybox_day/right.jpg",
-        "../textures/skybox_day/left.jpg",
-        "../textures/skybox_day/top.jpg",
-        "../textures/skybox_day/bottom.jpg",
-        "../textures/skybox_day/front.jpg",
-        "../textures/skybox_day/back.jpg"
-    };
+    //load skyboxes
     unsigned int cubemapTextureDay = tl.loadCubemap(faces_day);
+    unsigned int cubemapTextureNight = tl.loadCubemap(faces_night);
+    unsigned int cubemapTextureSpace1 = tl.loadCubemap(faces_space1);
+    unsigned int cubemapTextureSpace2 = tl.loadCubemap(faces_space2);
     currSkybox = cubemapTextureDay;
 
-    //skybox-night texture
-    vector<std::string> faces_night
-    {
-        "../textures/skybox_night/right.jpg",
-        "../textures/skybox_night/left.jpg",
-        "../textures/skybox_night/top.jpg",
-        "../textures/skybox_night/bottom.jpg",
-        "../textures/skybox_night/front.jpg",
-        "../textures/skybox_night/back.jpg"
-    };
-    unsigned int cubemapTextureNight = tl.loadCubemap(faces_night);
-
+    // VAOs and VBOs
     unsigned int lightVAO, VBO, transparentVAO, transparentVBO, grassVAO, grassVBO, quadVAO, quadVBO, skyboxVAO, skyboxVBO;
-
-    // Light
     setupVAOandVBO(lightVAO, VBO, ph.blandVertsNormalsTex, {3}, 8);
-
-    // Transparent
     setupVAOandVBO(transparentVAO, transparentVBO, ph.transparentVertices, {3, 2}, 5);
-
-    // Grass
     setupVAOandVBO(grassVAO, grassVBO, ph.grassVerts, {3, 2}, 5);
-
-    // Screen Quad
     setupVAOandVBO(quadVAO, quadVBO, ph.quadVertices, {2, 2}, 4);
-
-    // Skybox
     setupVAOandVBO(skyboxVAO, skyboxVBO, ph.skyboxVertices, {3}, 3);
 
-    //Creating the framebuffer
+    // framebuffers
     Framebuffer framebuffer = createFramebuffer(SCR_WIDTH, SCR_HEIGHT);
     Framebuffer msaa = createMSAAFrameBuffer(SCR_WIDTH, SCR_HEIGHT);
 
@@ -167,11 +93,8 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 130");
 
-    //****************************************************************************************************************************
-    //**************************************************************************************************************************** 
     // MAIN RENDER LOOP
     while(!glfwWindowShouldClose(window)) {
-
         //delta time
         float currentFrame = static_cast<float>(glfwGetTime());
         deltaTime = currentFrame - lastFrame;
@@ -179,11 +102,6 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
 
         //input
         controller->processInput(window, deltaTime, camera);
-
-        // imgui
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
 
         // wireframe
         if (wireFrame) { glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); }
@@ -200,13 +118,11 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         // draw MSAA
         if(renderToTexture) {
             glBindFramebuffer(GL_FRAMEBUFFER, msaa.ID);
-            glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             glEnable(GL_DEPTH_TEST);
         }
 
         // clear the buffers
-        glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
         //do objects first
@@ -234,50 +150,36 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         objectShader.setMat4("view", view);
 
         // render the loaded backpack model
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f, 0.0f, -2.0f));
-        model = glm::scale(model, glm::vec3(0.5f));
+        glm::mat4 model = backpack.getModelMatrix();
         objectShader.setMat4("model", model);
         backpack_obj.Draw(objectShader);
 
-        // // render the loaded stormtrooper model (rotate using quaternions)
-        // model = st.getModelMatrix();
-        // //model = glm::translate(model, glm::vec3(0.0f, 0.0f, 1.0f));
-        // static glm::quat stormtrooperRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f); // Identity quaternion
-        // if (rotateModels) { stormtrooperRotation = rotate(deltaTime, spinSpeed, stormtrooperRotation); }
-        // model = model * glm::mat4(stormtrooperRotation); // Apply rotation
-        // //model = glm::scale(model, glm::vec3(1.0f));
-        // objectShader.setMat4("model", model);
-        // st.setModelMatrix(model);
-        // stormtrooper_obj.Draw(objectShader);
-
-        //static glm::quat stormtrooperRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f); // Identity quaternion
-        //if (rotateModels) { stormtrooperRotation = rotate(deltaTime, spinSpeed, stormtrooperRotation); }
-
-        //st.setPosition(glm::vec3(0.0f, 0.0f, 1.0f)); // Example position
-        //st.setRotation(stormtrooperRotation);
-        //st.setScale(glm::vec3(1.0f));         
-        model = st.getModelMatrix();
+        // stormtrooper         
+        model = stormtrooper.getModelMatrix();
         objectShader.setMat4("model", model);
         stormtrooper_obj.Draw(objectShader);
 
-
         // render the loaded floor model
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f, -1.0f, 0.0f));
-        model = glm::scale(model, glm::vec3(1.0f));	
+        model = floor.getModelMatrix();
         objectShader.setMat4("model", model);
         wood_floor_obj.Draw(objectShader);
 
-        //disable face culling for transparent objects
-        glDisable(GL_CULL_FACE);
+        //render reflective stormtrooper model
+        reflectiveShader.use();
+        reflectiveShader.setMat4("projection", projection);
+        reflectiveShader.setMat4("view", view);
+        reflectiveShader.setInt("texture1", 0);
+        model = reflectiveST.getModelMatrix();
+        reflectiveShader.setMat4("model", model);
+        stormtrooper_obj.Draw(reflectiveShader);
 
         // change to using the pointLightcube shader
         pointlightcube.use();
         pointlightcube.setMat4("projection", projection);
         pointlightcube.setMat4("view", view);
+        glDisable(GL_CULL_FACE);
         glBindVertexArray(lightVAO);
-        glm::vec3* pointLights = sr.getpointLights();
+        vector<glm::vec3> pointLights = sr.getpointLights();
         // draw all the lamp objects for every light with correct color
         for (unsigned int i = 0; i < 4; i++) {
             glm::vec3 val;
@@ -305,18 +207,6 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             grassShader.setMat4("model", model);
             glDrawArrays(GL_TRIANGLES, 0, 6);
         }
-
-        //render reflective stormtrooper model
-        reflectiveShader.use();
-        reflectiveShader.setMat4("projection", projection);
-        reflectiveShader.setMat4("view", view);
-        reflectiveShader.setInt("texture1", 0);
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f, 4.0f, -6.0f));
-        if(rotateModels) { model = glm::rotate(model, (float)glfwGetTime() * glm::radians(spinSpeed), glm::vec3(0.0f, 1.0f, 0.0f)); }
-        model = glm::scale(model, glm::vec3(0.5f));
-        reflectiveShader.setMat4("model", model);
-        stormtrooper_obj.Draw(reflectiveShader);
 
         // draw skybox (LAST BUT BEFORE TRANSPARENT)
         glDepthFunc(GL_LEQUAL);
@@ -374,16 +264,14 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             glEnable(GL_DEPTH_TEST); // RE-ENABLE if not rendering to texture
         }
 
-         
 
-        // IMGUI BUTTONS
+        // imgui
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
         {
             static int counter = 0;
-
-            ImGui::Begin("George Engine Debug Menu");      
-
-            
-
+            ImGui::Begin("George Engine Debug Menu");    
             ImGui::Text("Debug controls"); 
 
             // Basic options
@@ -420,15 +308,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
                 {
                     ImGui::SliderFloat3("Light 2 Position", &sr.getpointLights()[3].x, -20.0f, 20.0f);
                 }
-                // Add more cases for other lights as needed
-
-
-                //ImGui::SliderFloat3("Light 1 Position", &sr.getpointLights()[0].x, -20.0f, 20.0f);
-                //ImGui::SliderFloat3("Light 2 Position", &sr.getpointLights()[1].x, -20.0f, 20.0f);
-                //ImGui::SliderFloat3("Light 3 Position", &sr.getpointLights()[2].x, -20.0f, 20.0f);
-                //ImGui::SliderFloat3("Light 4 Position", &sr.getpointLights()[3].x, -20.0f, 20.0f);
-                ImGui::ColorEdit3("clear color", (float*)&clear_color);
-
+                //ImGui::ColorEdit3("clear color", (float*)&clear_color);
                 ImGui::SliderFloat("Flashlight Intensity", &flashlightIntensity, 0.0f, 4.0f);
                 ImGui::SliderFloat("Pointlight Intensity", &pointLightIntensity, 0.0f, 4.0f);
                 ImGui::SliderFloat("Directional Light Intensity", &directionLightIntensity, 0.0f, 4.0f);
@@ -448,37 +328,42 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
                 ImGui::TreePop();
             }
 
-            //ImGui::Checkbox("Rotate Models?", &rotateModels);
-            //ImGui::SliderFloat("Rotation Speed", &spinSpeed, 0.0f, 500.0f);
-            if (ImGui::SliderFloat3("Stormtrooper Position", &st.getPosition().x, -20.0f, 20.0f)) {
-                st.setPosition(st.getPosition()); // Update the position and model matrix
+            if (ImGui::TreeNode("Game objects"))
+            {
+                for(auto object : objects) {
+                    if (ImGui::TreeNode(object->getName().c_str()))
+                    {
+                        if (ImGui::SliderFloat3((object->getName() + " Position").c_str(), &object->getPosition().x, -20.0f, 20.0f)) {
+                            object->setPosition(object->getPosition());
+                        }
+
+                        static float scaleScalar = 1.0f;
+                        if (ImGui::SliderFloat((object->getName() + " Scale").c_str(), &scaleScalar, 0.1f, 10.0f)) {
+                            object->setScale(glm::vec3(scaleScalar, scaleScalar, scaleScalar)); 
+                        }
+
+                        static glm::vec3 eulerRotation(0.0f, 0.0f, 0.0f);
+                        if (ImGui::SliderFloat3((object->getName() + " Rotation").c_str(), &eulerRotation.x, -180.0f, 180.0f)) {
+                            glm::quat quatRotation = glm::quat(glm::radians(eulerRotation));
+                            object->setRotation(quatRotation);
+                        }
+                        ImGui::TreePop();
+                    }
+                }
+                ImGui::TreePop();
             }
 
-            static float scaleScalar = 1.0f;
-            if (ImGui::SliderFloat("Stormtrooper Scale", &scaleScalar, 0.1f, 10.0f)) {
-                st.setScale(glm::vec3(scaleScalar, scaleScalar, scaleScalar)); // Update the position and model matrix
-            }
 
-            static glm::vec3 eulerRotation(0.0f, 0.0f, 0.0f); // Store Euler angles for ImGui input
-            if (ImGui::SliderFloat3("Rotation (Pitch, Yaw, Roll)", &eulerRotation.x, -180.0f, 180.0f)) {
-                glm::quat quatRotation = glm::quat(glm::radians(eulerRotation));
-                st.setRotation(quatRotation);
-            }
-
-
-            static const char* items[]{"Day","Night"};
+            static const char* items[]{"Day","Night", "Space1", "Space2"};
             static int Selecteditem = 0;
             if (ImGui::Combo("Skybox Selector", &Selecteditem, items, IM_ARRAYSIZE(items)))
             {
                 // Here event is fired
                 if(Selecteditem == 0) { currSkybox = cubemapTextureDay; }
                 else if(Selecteditem == 1) { currSkybox = cubemapTextureNight; }
+                else if(Selecteditem == 2) { currSkybox = cubemapTextureSpace1; }
+                else if(Selecteditem == 3) { currSkybox = cubemapTextureSpace2; }
             }
-
-            //if (ImGui::Button("Button"))
-            //    counter++;
-            //ImGui::SameLine();
-            //ImGui::Text("counter = %d", counter);
 
             if (ImGui::Button("Close Application")) { glfwSetWindowShouldClose(window, true); }
 
@@ -511,28 +396,4 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
-}
-
-
-// Helper function to set up VAO and VBO
-void Renderer::setupVAOandVBO(unsigned int &VAO, unsigned int &VBO, 
-                    const std::vector<float> &data, 
-                    const std::vector<int> &attributes, 
-                    int stride) {
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, data.size() * sizeof(float), data.data(), GL_STATIC_DRAW);
-
-    // Set up vertex attributes
-    int offset = 0;
-    for (size_t i = 0; i < attributes.size(); ++i) {
-        glEnableVertexAttribArray(i);
-        glVertexAttribPointer(i, attributes[i], GL_FLOAT, GL_FALSE, stride * sizeof(float), (void*)(offset * sizeof(float)));
-        offset += attributes[i]; // Increment offset by the size of this attribute
-    }
-
-    glBindVertexArray(0); // Unbind VAO
 }

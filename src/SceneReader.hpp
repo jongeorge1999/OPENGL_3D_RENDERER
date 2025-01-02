@@ -10,7 +10,7 @@
 class SceneReader {    
     private:
         // positions of the point lights
-        glm::vec3 pointLightPositions[4] = {
+        vector<glm::vec3> pointLightPositions = {
             glm::vec3( 0.7f,  0.2f,  2.0f),
             glm::vec3( 2.3f, 3.3f, -4.0f),
             glm::vec3(-4.0f,  2.0f, -12.0f),
@@ -94,7 +94,7 @@ class SceneReader {
             objectShader.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(15.0f)));
         }
 
-        glm::vec3* getpointLights() { return pointLightPositions; }
+        vector<glm::vec3>& getpointLights() { return pointLightPositions; }
         vector<glm::vec3> getWindows() { return windows; }
         vector<glm::vec3> getVegetation() { return vegetation; }
 };

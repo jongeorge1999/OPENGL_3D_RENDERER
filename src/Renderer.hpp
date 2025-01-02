@@ -9,6 +9,10 @@
 #include <vector>
 #include "Camera.hpp"
 #include "Controller.hpp"
+#include "Object.hpp"
+#include "TexLoader.hpp"
+#include "SceneReader.hpp"
+#include "PrimitiveHelper.hpp"
 
 class Renderer {
     private:
@@ -16,13 +20,51 @@ class Renderer {
         Renderer(){}
         ~Renderer(){}
 
-        void Render(GLFWwindow* window, Camera* camera, Controller* controller);
+        //screen width and height
+        const unsigned int SCR_WIDTH = 2400;
+        const unsigned int SCR_HEIGHT = 1800;
 
-        // Helper function to set up VAO and VBO
-        void setupVAOandVBO(unsigned int &VAO, unsigned int &VBO, 
-                            const std::vector<float> &data, 
-                            const std::vector<int> &attributes, 
-                            int stride);
+        //Game object manager
+        std::vector<Object*> objects;
+
+        //Texture loader
+        TexLoader tl;
+
+        //scene reader
+        SceneReader sr;
+
+        // primitve helper
+        PrimitiveHelper ph;
+
+        // timing
+        float deltaTime = 0.0f;
+        float lastFrame = 0.0f;
+
+        //ImVec4 clear_color = ImVec4(0.0f, 0.0f, 0.0f, 1.00f);
+        bool rotateModels = true;
+        bool show_another_window = false;
+        bool useDiffuse = true;
+        bool useSpecular = true;
+        bool useAmbient = true;
+        bool useFlashlight = false;
+        bool useDirectionalLight = true;
+        bool usePointLight = true;
+        bool showDepthBuffer = false;
+        bool wireFrame = false;
+        bool renderToTexture = true;
+        bool inverted = false;
+        bool grayscale = false;
+        bool sharpen = false;
+        bool blur = false;
+        bool edgeDetection = false;
+        float spinSpeed = 0.0f;
+        float flashlightIntensity = 1.0f;
+        float directionLightIntensity = 1.0f;
+        float pointLightIntensity = 1.0f;
+        unsigned int currSkybox = 0;
+
+
+        void Render(GLFWwindow* window, Camera* camera, Controller* controller);
 
         struct Framebuffer {
             unsigned int ID;            // Framebuffer ID
@@ -103,6 +145,67 @@ class Renderer {
             objRotation = glm::normalize(objRotation); // Normalize to avoid precision issues
             return objRotation;
         }
+
+
+        // Helper function to set up VAO and VBO
+        inline void setupVAOandVBO(unsigned int &VAO, unsigned int &VBO, 
+                            const std::vector<float> &data, 
+                            const std::vector<int> &attributes, 
+                            int stride) {
+            glGenVertexArrays(1, &VAO);
+            glGenBuffers(1, &VBO);
+            
+            glBindVertexArray(VAO);
+            glBindBuffer(GL_ARRAY_BUFFER, VBO);
+            glBufferData(GL_ARRAY_BUFFER, data.size() * sizeof(float), data.data(), GL_STATIC_DRAW);
+
+            // Set up vertex attributes
+            int offset = 0;
+            for (size_t i = 0; i < attributes.size(); ++i) {
+                glEnableVertexAttribArray(i);
+                glVertexAttribPointer(i, attributes[i], GL_FLOAT, GL_FALSE, stride * sizeof(float), (void*)(offset * sizeof(float)));
+                offset += attributes[i]; // Increment offset by the size of this attribute
+            }
+
+            glBindVertexArray(0); // Unbind VAO
+        }
+
+
+        vector<std::string> faces_day {
+            "../textures/skybox_day/right.jpg",
+            "../textures/skybox_day/left.jpg",
+            "../textures/skybox_day/top.jpg",
+            "../textures/skybox_day/bottom.jpg",
+            "../textures/skybox_day/front.jpg",
+            "../textures/skybox_day/back.jpg"
+         };
+
+        vector<std::string> faces_night {
+            "../textures/skybox_night/right.jpg",
+            "../textures/skybox_night/left.jpg",
+            "../textures/skybox_night/top.jpg",
+            "../textures/skybox_night/bottom.jpg",
+            "../textures/skybox_night/front.jpg",
+            "../textures/skybox_night/back.jpg"
+        };
+
+        vector<std::string> faces_space1 {
+            "../textures/space_skybox1/space1_left.png",
+            "../textures/space_skybox1/space1_right.png",
+            "../textures/space_skybox1/space1_up.png",
+            "../textures/space_skybox1/space1_down.png",
+            "../textures/space_skybox1/space1_front.png",
+            "../textures/space_skybox1/space1_back.png"
+        };
+        
+        vector<std::string> faces_space2 {
+            "../textures/space_skybox2/space2_left.png",
+            "../textures/space_skybox2/space2_right.png",
+            "../textures/space_skybox2/space2_top.png",
+            "../textures/space_skybox2/space2_bottom.png",
+            "../textures/space_skybox2/space2_front.png",
+            "../textures/space_skybox2/space2_back.png"
+        };
 
 
 };
