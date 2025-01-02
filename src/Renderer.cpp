@@ -450,9 +450,8 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
 
             //ImGui::Checkbox("Rotate Models?", &rotateModels);
             //ImGui::SliderFloat("Rotation Speed", &spinSpeed, 0.0f, 500.0f);
-            glm::vec3 tempPosition = st.getPosition();
-            if (ImGui::SliderFloat3("Stormtrooper Position", &tempPosition.x, -20.0f, 20.0f)) {
-                st.setPosition(tempPosition); // Update the position and model matrix
+            if (ImGui::SliderFloat3("Stormtrooper Position", &st.getPosition().x, -20.0f, 20.0f)) {
+                st.setPosition(st.getPosition()); // Update the position and model matrix
             }
 
             static float scaleScalar = 1.0f;

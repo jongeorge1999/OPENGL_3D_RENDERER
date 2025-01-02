@@ -17,7 +17,7 @@ public:
     Object()
         : position(0.0f), rotation(glm::quat(1.0f, 0.0f, 0.0f, 0.0f)), scale(1.0f), modelMatrix(glm::mat4(1.0f)) {}
 
-    glm::vec3 getPosition() const { 
+    glm::vec3& getPosition() { 
         return position; // Return a copy (const behavior)
     }
 
