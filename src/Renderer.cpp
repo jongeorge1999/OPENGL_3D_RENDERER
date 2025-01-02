@@ -1,9 +1,11 @@
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#define GLM_FORCE_RADIANS
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#include <glm/gtx/string_cast.hpp>
 
 #include <imGui/imgui.h>
 #include <imGui/imgui_impl_glfw.h>
@@ -23,6 +25,7 @@
 #include "TexLoader.hpp"
 #include "PrimitiveHelper.hpp"
 #include "Shader.hpp"
+#include "Object.hpp"
 
 //Texture loader
 TexLoader tl;
@@ -32,6 +35,9 @@ PrimitiveHelper ph;
 
 //scene reader
 SceneReader sr;
+
+//creating game objects
+Object st;
 
 //screen width and height
 const unsigned int SCR_WIDTH = 2400;
@@ -95,6 +101,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     Shader screenShader("../src/shaders/screenBuffer.vert", "../src/shaders/screenBuffer.frag");
     Shader skyboxShader("../src/shaders/skybox.vert", "../src/shaders/skybox.frag");
     Shader reflectiveShader("../src/shaders/reflectiveCubemap.vert", "../src/shaders/reflectiveCubemap.frag");
+    Shader normalShader("../src/shaders/normals.vert", "../src/shaders/normals.frag",  "../src/shaders/normals.geom");
 
     // load models
     Model backpack_obj("../models/backpack/backpack.obj");
@@ -131,88 +138,26 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     };
     unsigned int cubemapTextureNight = tl.loadCubemap(faces_night);
 
-    // bind buffers and VAOs
-    unsigned int VBO, lightVAO;
-    glGenBuffers(1, &VBO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(ph.blandVertsNormalsTex), ph.blandVertsNormalsTex.data(), GL_STATIC_DRAW);
-    glGenVertexArrays(1, &lightVAO);
-    glBindVertexArray(lightVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0); 
+    unsigned int lightVAO, VBO, transparentVAO, transparentVBO, grassVAO, grassVBO, quadVAO, quadVBO, skyboxVAO, skyboxVBO;
 
-    //transparent
-    unsigned int transparentVAO, transparentVBO;
-    glGenVertexArrays(1, &transparentVAO);
-    glGenBuffers(1, &transparentVBO);
-    glBindVertexArray(transparentVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, transparentVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(ph.transparentVertices), ph.transparentVertices.data(), GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
-    glBindVertexArray(0);
+    // Light
+    setupVAOandVBO(lightVAO, VBO, ph.blandVertsNormalsTex, {3}, 8);
 
-    //grass
-    unsigned int grassVAO, grassVBO;
-    glGenVertexArrays(1, &grassVAO);
-    glGenBuffers(1, &grassVBO);
-    glBindVertexArray(grassVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, grassVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(ph.grassVerts), ph.grassVerts.data(), GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
-    glBindVertexArray(0);
+    // Transparent
+    setupVAOandVBO(transparentVAO, transparentVBO, ph.transparentVertices, {3, 2}, 5);
 
+    // Grass
+    setupVAOandVBO(grassVAO, grassVBO, ph.grassVerts, {3, 2}, 5);
 
-    // screen quad VAO
-    unsigned int quadVAO, quadVBO;
-    glGenVertexArrays(1, &quadVAO);
-    glGenBuffers(1, &quadVBO);
-    glBindVertexArray(quadVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(ph.quadVertices), ph.quadVertices.data(), GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    // Screen Quad
+    setupVAOandVBO(quadVAO, quadVBO, ph.quadVertices, {2, 2}, 4);
 
+    // Skybox
+    setupVAOandVBO(skyboxVAO, skyboxVBO, ph.skyboxVertices, {3}, 3);
 
-     // skybox VAO
-    unsigned int skyboxVAO, skyboxVBO;
-    glGenVertexArrays(1, &skyboxVAO);
-    glGenBuffers(1, &skyboxVBO);
-    glBindVertexArray(skyboxVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, skyboxVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(ph.skyboxVertices), ph.skyboxVertices.data(), GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-
-
-    // framebuffer configuration
-    unsigned int framebuffer;
-    glGenFramebuffers(1, &framebuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-    // create a color attachment texture
-    unsigned int textureColorbuffer;
-    glGenTextures(1, &textureColorbuffer);
-    glBindTexture(GL_TEXTURE_2D, textureColorbuffer);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureColorbuffer, 0);
-    //render buffer object
-    unsigned int rbo;
-    glGenRenderbuffers(1, &rbo);
-    glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) { cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << endl; }
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    //Creating the framebuffer
+    Framebuffer framebuffer = createFramebuffer(SCR_WIDTH, SCR_HEIGHT);
+    Framebuffer msaa = createMSAAFrameBuffer(SCR_WIDTH, SCR_HEIGHT);
 
     // Initialize ImGui
     IMGUI_CHECKVERSION();
@@ -252,8 +197,13 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             sorted[distance] = windows[i];
         }
 
-        // render to screen or to texture
-        if(renderToTexture) { glBindFramebuffer(GL_FRAMEBUFFER, framebuffer); glEnable(GL_DEPTH_TEST); }
+        // draw MSAA
+        if(renderToTexture) {
+            glBindFramebuffer(GL_FRAMEBUFFER, msaa.ID);
+            glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            glEnable(GL_DEPTH_TEST);
+        }
 
         // clear the buffers
         glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
@@ -290,13 +240,27 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         objectShader.setMat4("model", model);
         backpack_obj.Draw(objectShader);
 
-        // render the loaded stormtrooper model
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 1.0f));
-        model = glm::scale(model, glm::vec3(1.0f));
-        if(rotateModels) { model = glm::rotate(model, (float)glfwGetTime() * glm::radians(spinSpeed), glm::vec3(0.0f, 1.0f, 0.0f)); }
+        // // render the loaded stormtrooper model (rotate using quaternions)
+        // model = st.getModelMatrix();
+        // //model = glm::translate(model, glm::vec3(0.0f, 0.0f, 1.0f));
+        // static glm::quat stormtrooperRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f); // Identity quaternion
+        // if (rotateModels) { stormtrooperRotation = rotate(deltaTime, spinSpeed, stormtrooperRotation); }
+        // model = model * glm::mat4(stormtrooperRotation); // Apply rotation
+        // //model = glm::scale(model, glm::vec3(1.0f));
+        // objectShader.setMat4("model", model);
+        // st.setModelMatrix(model);
+        // stormtrooper_obj.Draw(objectShader);
+
+        //static glm::quat stormtrooperRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f); // Identity quaternion
+        //if (rotateModels) { stormtrooperRotation = rotate(deltaTime, spinSpeed, stormtrooperRotation); }
+
+        //st.setPosition(glm::vec3(0.0f, 0.0f, 1.0f)); // Example position
+        //st.setRotation(stormtrooperRotation);
+        //st.setScale(glm::vec3(1.0f));         
+        model = st.getModelMatrix();
         objectShader.setMat4("model", model);
         stormtrooper_obj.Draw(objectShader);
+
 
         // render the loaded floor model
         model = glm::mat4(1.0f);
@@ -383,13 +347,19 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             glDrawArrays(GL_TRIANGLES, 0, 6);
         }
 
+        // blit multisampled buffer(s) to normal colorbuffer of intermediate FBO. Image is stored in screenTexture
+        if(renderToTexture) {
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, msaa.ID);
+            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer.ID);
+            glBlitFramebuffer(0, 0, SCR_WIDTH, SCR_HEIGHT, 0, 0, SCR_WIDTH, SCR_HEIGHT, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        }
+
         // if rendering onto a quad
         if(renderToTexture) {
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             glDisable(GL_DEPTH_TEST);
             glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT);
-
             screenShader.use();
             screenShader.setBool("inverted", inverted);
             screenShader.setBool("grayscale", grayscale);
@@ -397,7 +367,8 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             screenShader.setBool("blur", blur);
             screenShader.setBool("edgeDetection", edgeDetection);
             glBindVertexArray(quadVAO);
-            glBindTexture(GL_TEXTURE_2D, textureColorbuffer);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, framebuffer.texture);
             glDrawArrays(GL_TRIANGLES, 0, 6);
         } else {
             glEnable(GL_DEPTH_TEST); // RE-ENABLE if not rendering to texture
@@ -409,31 +380,91 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         {
             static int counter = 0;
 
-            ImGui::Begin("George Engine Debug Menu");            
+            ImGui::Begin("George Engine Debug Menu");      
 
-            ImGui::Text("Debug controls");       
-            ImGui::Checkbox("Rotate Models?", &rotateModels);
-            ImGui::Checkbox("Use Ambient?", &useAmbient);
-            ImGui::Checkbox("Use Diffuse?", &useDiffuse);  
-            ImGui::Checkbox("Use Specular?", &useSpecular);  
-            ImGui::Checkbox("Use Flashlight?", &useFlashlight);
-            ImGui::Checkbox("Use Directional Light?", &useDirectionalLight); 
-            ImGui::Checkbox("Use Point Light?", &usePointLight); 
-            ImGui::Checkbox("Show depth buffer?", &showDepthBuffer);
-            ImGui::Checkbox("wireframe?", &wireFrame);
-            ImGui::Checkbox("Render to texture?", &renderToTexture);
-            ImGui::Checkbox("invert?", &inverted);
-            ImGui::Checkbox("grayscale?", &grayscale);
-            ImGui::Checkbox("sharpen?", &sharpen);
-            ImGui::Checkbox("blur?", &blur);
-            ImGui::Checkbox("edge detection?", &edgeDetection);
+            
 
-            ImGui::SliderFloat("Rotation Speed", &spinSpeed, 0.0f, 500.0f);
-            ImGui::ColorEdit3("clear color", (float*)&clear_color);
+            ImGui::Text("Debug controls"); 
 
-            ImGui::SliderFloat("Flashlight Intensity", &flashlightIntensity, 0.0f, 4.0f);
-            ImGui::SliderFloat("Pointlight Intensity", &pointLightIntensity, 0.0f, 4.0f);
-            ImGui::SliderFloat("Directional Light Intensity", &directionLightIntensity, 0.0f, 4.0f);
+            // Basic options
+            if (ImGui::TreeNode("Light Options"))
+            {
+                ImGui::Checkbox("Use Ambient?", &useAmbient);
+                ImGui::Checkbox("Use Diffuse?", &useDiffuse);  
+                ImGui::Checkbox("Use Specular?", &useSpecular);  
+                ImGui::Checkbox("Use Flashlight?", &useFlashlight);
+                ImGui::Checkbox("Use Directional Light?", &useDirectionalLight); 
+                ImGui::Checkbox("Use Point Light?", &usePointLight); 
+                static const char* light[] = { "1", "2", "3", "4" };
+                static int selectedLight = 0;
+
+                if (ImGui::Combo("Light Selector", &selectedLight, light, IM_ARRAYSIZE(light)))
+                {
+                    // Combo logic here if needed (e.g., firing an event)
+                }
+
+                // Display the corresponding slider based on the selected light
+                if (selectedLight == 0) 
+                {
+                    ImGui::SliderFloat3("Light 1 Position", &sr.getpointLights()[0].x, -20.0f, 20.0f);
+                } 
+                else if (selectedLight == 1) 
+                {
+                    ImGui::SliderFloat3("Light 2 Position", &sr.getpointLights()[1].x, -20.0f, 20.0f);
+                }
+                else if (selectedLight == 2) 
+                {
+                    ImGui::SliderFloat3("Light 2 Position", &sr.getpointLights()[2].x, -20.0f, 20.0f);
+                }
+                else if (selectedLight == 3) 
+                {
+                    ImGui::SliderFloat3("Light 2 Position", &sr.getpointLights()[3].x, -20.0f, 20.0f);
+                }
+                // Add more cases for other lights as needed
+
+
+                //ImGui::SliderFloat3("Light 1 Position", &sr.getpointLights()[0].x, -20.0f, 20.0f);
+                //ImGui::SliderFloat3("Light 2 Position", &sr.getpointLights()[1].x, -20.0f, 20.0f);
+                //ImGui::SliderFloat3("Light 3 Position", &sr.getpointLights()[2].x, -20.0f, 20.0f);
+                //ImGui::SliderFloat3("Light 4 Position", &sr.getpointLights()[3].x, -20.0f, 20.0f);
+                ImGui::ColorEdit3("clear color", (float*)&clear_color);
+
+                ImGui::SliderFloat("Flashlight Intensity", &flashlightIntensity, 0.0f, 4.0f);
+                ImGui::SliderFloat("Pointlight Intensity", &pointLightIntensity, 0.0f, 4.0f);
+                ImGui::SliderFloat("Directional Light Intensity", &directionLightIntensity, 0.0f, 4.0f);
+                ImGui::TreePop();
+            }
+
+            if (ImGui::TreeNode("Post-Processing Options"))
+            {
+                ImGui::Checkbox("Show depth buffer?", &showDepthBuffer);
+                ImGui::Checkbox("wireframe?", &wireFrame);
+                ImGui::Checkbox("Render to texture?", &renderToTexture);
+                ImGui::Checkbox("invert?", &inverted);
+                ImGui::Checkbox("grayscale?", &grayscale);
+                ImGui::Checkbox("sharpen?", &sharpen);
+                ImGui::Checkbox("blur?", &blur);
+                ImGui::Checkbox("edge detection?", &edgeDetection);
+                ImGui::TreePop();
+            }
+
+            //ImGui::Checkbox("Rotate Models?", &rotateModels);
+            //ImGui::SliderFloat("Rotation Speed", &spinSpeed, 0.0f, 500.0f);
+            glm::vec3 tempPosition = st.getPosition();
+            if (ImGui::SliderFloat3("Stormtrooper Position", &tempPosition.x, -20.0f, 20.0f)) {
+                st.setPosition(tempPosition); // Update the position and model matrix
+            }
+
+            static float scaleScalar = 1.0f;
+            if (ImGui::SliderFloat("Stormtrooper Scale", &scaleScalar, 0.1f, 10.0f)) {
+                st.setScale(glm::vec3(scaleScalar, scaleScalar, scaleScalar)); // Update the position and model matrix
+            }
+
+            static glm::vec3 eulerRotation(0.0f, 0.0f, 0.0f); // Store Euler angles for ImGui input
+            if (ImGui::SliderFloat3("Rotation (Pitch, Yaw, Roll)", &eulerRotation.x, -180.0f, 180.0f)) {
+                glm::quat quatRotation = glm::quat(glm::radians(eulerRotation));
+                st.setRotation(quatRotation);
+            }
 
 
             static const char* items[]{"Day","Night"};
@@ -476,9 +507,33 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     glDeleteBuffers(1, &grassVBO);
     glDeleteBuffers(1, &transparentVBO);
     glDeleteBuffers(1, &skyboxVBO);
-    glDeleteRenderbuffers(1, &rbo);
-    glDeleteFramebuffers(1, &framebuffer);
+    deleteFramebuffer(framebuffer);
+    deleteFramebuffer(msaa);
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
+}
+
+
+// Helper function to set up VAO and VBO
+void Renderer::setupVAOandVBO(unsigned int &VAO, unsigned int &VBO, 
+                    const std::vector<float> &data, 
+                    const std::vector<int> &attributes, 
+                    int stride) {
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
+    
+    glBindVertexArray(VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, data.size() * sizeof(float), data.data(), GL_STATIC_DRAW);
+
+    // Set up vertex attributes
+    int offset = 0;
+    for (size_t i = 0; i < attributes.size(); ++i) {
+        glEnableVertexAttribArray(i);
+        glVertexAttribPointer(i, attributes[i], GL_FLOAT, GL_FALSE, stride * sizeof(float), (void*)(offset * sizeof(float)));
+        offset += attributes[i]; // Increment offset by the size of this attribute
+    }
+
+    glBindVertexArray(0); // Unbind VAO
 }

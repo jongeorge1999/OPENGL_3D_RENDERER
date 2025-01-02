@@ -9,6 +9,9 @@
 
 class Shader {
     public:
+
+        //Shader(){}
+
         unsigned int ID;
         Shader(const char* vertexPath, const char* fragmentPath, const char* geometryPath = nullptr) {
             std::string vertexCode;

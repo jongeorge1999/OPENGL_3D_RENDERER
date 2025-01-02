@@ -7,7 +7,7 @@ class PrimitiveHelper {
         PrimitiveHelper(){}
         ~PrimitiveHelper(){}
 
-        std::array<float, 30> grassVerts = {
+        const std::vector<float> grassVerts = {
             // positions         // texture Coords
             0.0f,  0.5f,  0.0f,  0.0f,  1.0f,
             0.0f, -0.5f,  0.0f,  0.0f,  0.0f,
@@ -18,7 +18,7 @@ class PrimitiveHelper {
             1.0f,  0.5f,  0.0f,  1.0f,  1.0f
         };
 
-        std::array<float, 30> transparentVertices = {
+        const std::vector<float> transparentVertices = {
             0.0f,  0.5f,  0.0f,  0.0f,  0.0f,
             0.0f, -0.5f,  0.0f,  0.0f,  1.0f,
             1.0f, -0.5f,  0.0f,  1.0f,  1.0f,
@@ -28,7 +28,7 @@ class PrimitiveHelper {
             1.0f,  0.5f,  0.0f,  1.0f,  0.0f
         };
 
-        std::array<glm::vec3, 10> cubePositions = {
+        const std::vector<glm::vec3> cubePositions = {
             glm::vec3( 0.0f,  0.0f,  0.0f), 
             glm::vec3( 2.0f,  5.0f, -15.0f), 
             glm::vec3(-1.5f, -2.2f, -2.5f),  
@@ -41,7 +41,7 @@ class PrimitiveHelper {
             glm::vec3(-1.3f,  1.0f, -1.5f) 
         };
 
-        std::array<float, 108> skyboxVertices = {        
+        const std::vector<float> skyboxVertices = {        
             -1.0f,  1.0f, -1.0f,
             -1.0f, -1.0f, -1.0f,
             1.0f, -1.0f, -1.0f,
@@ -86,7 +86,7 @@ class PrimitiveHelper {
         };
 
         //render to texture quad
-        std::array<float, 24> quadVertices = { 
+       const std::vector<float> quadVertices = { 
             // positions   // texCoords
             -1.0f,  1.0f,  0.0f, 1.0f,
             -1.0f, -1.0f,  0.0f, 0.0f,
@@ -97,7 +97,7 @@ class PrimitiveHelper {
             1.0f,  1.0f,  1.0f, 1.0f
         };
     
-        std::array<float, 288> cubeVerts = {
+        const std::vector<float> cubeVerts = {
             -0.5f, -0.5f, -0.5f,  1.0f, 0.0f, 0.0f,  0.0f, 0.0f,
             0.5f, -0.5f, -0.5f,  0.0f, 1.0f, 0.0f,  1.0f, 0.0f,
             0.5f,  0.5f, -0.5f,  0.0f, 0.0f, 1.0f,  1.0f, 1.0f,
@@ -141,7 +141,7 @@ class PrimitiveHelper {
             -0.5f,  0.5f, -0.5f,  1.0f, 1.0f, 1.0f,  0.0f, 1.0f
         };
 
-        std::array<float, 108> blandVerts = {
+        const std::vector<float> blandVerts = {
             -0.5f, -0.5f, -0.5f, 
             0.5f, -0.5f, -0.5f,  
             0.5f,  0.5f, -0.5f,  
@@ -185,7 +185,7 @@ class PrimitiveHelper {
             -0.5f,  0.5f, -0.5f, 
         };
 
-        std::array<float, 216> blandVertsNormals = {
+        const std::vector<float> blandVertsNormals = {
             -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
             0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
             0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
@@ -229,7 +229,7 @@ class PrimitiveHelper {
             -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f
         };
 
-         std::array<float, 288> blandVertsNormalsTex = {
+         const std::vector<float> blandVertsNormalsTex = {
             // positions          // normals           // texture coords
             -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  0.0f, 0.0f,
             0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  1.0f, 0.0f,
@@ -274,7 +274,7 @@ class PrimitiveHelper {
             -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  0.0f, 1.0f
         };
 
-        std::array<unsigned int, 36> cubeIndices = {
+        const std::vector<float> cubeIndices = {
             // Front face
             0, 1, 2,
             2, 3, 0,
@@ -296,7 +296,7 @@ class PrimitiveHelper {
         };
 
 
-        std::array<float, 48> sphereVerts = {
+        const std::vector<float> sphereVerts = {
             // Positions         // Normals           // Texture Coords
             0.0f,  0.0f,  1.0f,  0.0f,  0.0f,  1.0f,  0.5f, 0.5f, // Vertex 0 (Top)
             0.0f,  0.0f, -1.0f,  0.0f,  0.0f, -1.0f,  0.5f, 0.5f, // Vertex 1 (Bottom)
@@ -306,7 +306,7 @@ class PrimitiveHelper {
             0.0f, -1.0f,  0.0f,  0.0f, -1.0f,  0.0f,  1.0f, 0.5f  // Vertex 5
         };
 
-        std::array<unsigned int, 24> sphereIndices = {
+        const std::vector<float> sphereIndices = {
             // Top triangle
             0, 2, 3,
             0, 3, 4,

@@ -86,7 +86,7 @@ void main() {
     // properties
     vec3 norm = normalize(Normal);
     vec3 viewDir = normalize(viewPos - FragPos);
-    vec3 result;
+    vec3 result = vec3(0.0);
     
 
     // directional lighting
