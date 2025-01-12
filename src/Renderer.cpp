@@ -24,7 +24,7 @@
 
 void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller) {
     //create game objects
-    Object stormtrooper("Stormtrooper");
+    Object stormtrooper("Stormtrooper", glm::vec3(4.0f, -0.9f, 0.0f));
     Object backpack("backpack", glm::vec3(0.0f, 2.0f, 5.0f), glm::vec3(0.5f));
     Object floor("floor", glm::vec3(0.0f, -1.0f, 0.0f));
     Object reflectiveST("Reflective ST", glm::vec3(2.0f, 0.0f, 2.0f));
@@ -40,7 +40,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
 
     // GL settings
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_STENCIL_TEST);
+    //glEnable(GL_STENCIL_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_CULL_FACE);  
@@ -56,6 +56,8 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     Shader skyboxShader("../src/shaders/skybox.vert", "../src/shaders/skybox.frag");
     Shader reflectiveShader("../src/shaders/reflectiveCubemap.vert", "../src/shaders/reflectiveCubemap.frag");
     Shader normalShader("../src/shaders/normals.vert", "../src/shaders/normals.frag",  "../src/shaders/normals.geom");
+    Shader depthShader("../src/shaders/depthShader.vert", "../src/shaders/depthShader.frag");
+    Shader depthTestShader("../src/shaders/depthTestShader.vert", "../src/shaders/depthTestShader.frag");
 
     // load models
     Model backpack_obj("../models/backpack/backpack.obj");
@@ -65,6 +67,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     //load textures
     unsigned int transparentTexture = tl.loadTexture("../textures/red_window.png");
     unsigned int grassTexture = tl.loadTexture("../textures/grass.png");
+    unsigned int brickTexture = tl.loadTexture("../textures/brick.jpg");
 
     //load skyboxes
     unsigned int cubemapTextureDay = tl.loadCubemap(faces_day);
@@ -85,6 +88,34 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     Framebuffer framebuffer = createFramebuffer(SCR_WIDTH, SCR_HEIGHT);
     Framebuffer msaa = createMSAAFrameBuffer(SCR_WIDTH, SCR_HEIGHT);
 
+    // configure depth map FBO
+    // -----------------------
+    const unsigned int SHADOW_WIDTH = 4096, SHADOW_HEIGHT = 4096;
+    unsigned int depthMapFBO;
+    glGenFramebuffers(1, &depthMapFBO);
+    // create depth texture
+    unsigned int depthMap;
+    glGenTextures(1, &depthMap);
+    glBindTexture(GL_TEXTURE_2D, depthMap);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    float borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+    // attach depth texture as FBO's depth buffer
+    glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+
+    // Check framebuffer status
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        std::cerr << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
     // Initialize ImGui
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -92,9 +123,18 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     ImGui::StyleColorsDark();
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 130");
+    
+    objectShader.use();
+    objectShader.setInt("shadowMap", 4);
+    // screenShader.use();
+    // screenShader.setInt("screenTexture", 0);
 
     // MAIN RENDER LOOP
     while(!glfwWindowShouldClose(window)) {
+
+        //gamma correction
+        if (gammaCorrection) {glEnable(GL_FRAMEBUFFER_SRGB);} else { glDisable(GL_FRAMEBUFFER_SRGB);}
+
         //delta time
         float currentFrame = static_cast<float>(glfwGetTime());
         deltaTime = currentFrame - lastFrame;
@@ -104,8 +144,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         controller->processInput(window, deltaTime, camera);
 
         // wireframe
-        if (wireFrame) { glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); }
-        else { glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); }
+        if (wireFrame) { glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); } else { glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); }
 
         // sort the transparent windows
         vector<glm::vec3> windows = sr.getWindows();
@@ -115,15 +154,61 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             sorted[distance] = windows[i];
         }
 
+
+        //variables for shadows
+        glm::mat4 lightProjection, lightView;
+        glm::mat4 lightSpaceMatrix;
+        float near_plane = 0.1f, far_plane = 25.0f;
+        //lightProjection = glm::perspective(glm::radians(45.0f), (GLfloat)SHADOW_WIDTH / (GLfloat)SHADOW_HEIGHT, near_plane, far_plane); // note that if you use a perspective projection matrix you'll have to change the light position as the current light position isn't enough to reflect the whole scene
+        lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
+        lightView = glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        lightSpaceMatrix = lightProjection * lightView;
+        glm::mat4 model;
+
+
+         // 1. render depth of scene to texture (from light's perspective)
+        // --------------------------------------------------------------
+        // render scene from light's point of view
+            glCullFace(GL_FRONT);
+            depthShader.use();
+            depthShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+
+            glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+            glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+                glClear(GL_DEPTH_BUFFER_BIT);
+
+                // render the loaded backpack model
+                model = backpack.getModelMatrix();
+                depthShader.setMat4("model", model);
+                backpack_obj.Draw(depthShader);
+
+                // stormtrooper         
+                model = stormtrooper.getModelMatrix();
+                depthShader.setMat4("model", model);
+                stormtrooper_obj.Draw(depthShader);
+
+                // render the loaded floor model
+                model = floor.getModelMatrix();
+                depthShader.setMat4("model", model);
+                wood_floor_obj.Draw(depthShader);
+
+                model = reflectiveST.getModelMatrix();
+                depthShader.setMat4("model", model);
+                stormtrooper_obj.Draw(depthShader);
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+            // reset viewport
+            glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+
         // draw MSAA
         if(renderToTexture) {
             glBindFramebuffer(GL_FRAMEBUFFER, msaa.ID);
             glEnable(GL_DEPTH_TEST);
-        }
-
+        } 
+        
         // clear the buffers
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         //do objects first
         objectShader.use();
@@ -135,6 +220,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         objectShader.setBool("useAmbient", useAmbient);
         objectShader.setBool("useDiffuse", useDiffuse);
         objectShader.setBool("useSpecular", useSpecular);
+        objectShader.setBool("useBlinn", useBlinn);
         objectShader.setBool("useFlashlight", useFlashlight);
         objectShader.setBool("useDirectionalLight", useDirectionalLight);
         objectShader.setBool("usePointLight", usePointLight);
@@ -142,15 +228,22 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         objectShader.setFloat("flashlightIntensity", flashlightIntensity);
         objectShader.setFloat("directionalLightIntensity", directionLightIntensity);
         objectShader.setFloat("pointLightIntensity", pointLightIntensity);
+        objectShader.setBool("useShadows", useShadows);
        
         // setting the object transform
         glm::mat4 projection = glm::perspective(glm::radians(camera->Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         glm::mat4 view = camera->GetViewMatrix();
         objectShader.setMat4("projection", projection);
         objectShader.setMat4("view", view);
+        objectShader.setVec3("viewPos", camera->Position);
+        objectShader.setVec3("lightPos", lightPos);
+        objectShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_2D, depthMap);
 
         // render the loaded backpack model
-        glm::mat4 model = backpack.getModelMatrix();
+        model = backpack.getModelMatrix();
         objectShader.setMat4("model", model);
         backpack_obj.Draw(objectShader);
 
@@ -241,11 +334,17 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         if(renderToTexture) {
             glBindFramebuffer(GL_READ_FRAMEBUFFER, msaa.ID);
             glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer.ID);
-            glBlitFramebuffer(0, 0, SCR_WIDTH, SCR_HEIGHT, 0, 0, SCR_WIDTH, SCR_HEIGHT, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+            glBlitFramebuffer(0, 0, SCR_WIDTH, SCR_HEIGHT, 0, 0, SCR_WIDTH, SCR_HEIGHT, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT, GL_NEAREST);
         }
 
-        // if rendering onto a quad
-        if(renderToTexture) {
+        // depthTestShader.use();
+        // glBindVertexArray(quadVAO);
+        // glActiveTexture(GL_TEXTURE0);
+        // glBindTexture(GL_TEXTURE_2D, depthMap);
+        // glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        // // if rendering onto a quad
+         if(renderToTexture) {
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             glDisable(GL_DEPTH_TEST);
             glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
@@ -279,10 +378,13 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             {
                 ImGui::Checkbox("Use Ambient?", &useAmbient);
                 ImGui::Checkbox("Use Diffuse?", &useDiffuse);  
-                ImGui::Checkbox("Use Specular?", &useSpecular);  
+                ImGui::Checkbox("Use Specular?", &useSpecular); 
+                ImGui::Checkbox("Use blinn-phong?", &useBlinn); 
+                ImGui::Checkbox("Use Gamma Correction?", &gammaCorrection);
                 ImGui::Checkbox("Use Flashlight?", &useFlashlight);
                 ImGui::Checkbox("Use Directional Light?", &useDirectionalLight); 
                 ImGui::Checkbox("Use Point Light?", &usePointLight); 
+                ImGui::Checkbox("Use Shadows?", &useShadows);
                 static const char* light[] = { "1", "2", "3", "4" };
                 static int selectedLight = 0;
 
@@ -368,6 +470,8 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             if (ImGui::Button("Close Application")) { glfwSetWindowShouldClose(window, true); }
 
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+            ImGui::Text("CamX %0.1f CamY %0.1f CamZ %0.1f", camera->Position.x, camera->Position.y, camera->Position.z);
+            ImGui::Text("CamYaw %0.1f CamPitch %0.1f", camera->Yaw, camera->Pitch);
             ImGui::End();
 
             // render the imgui window

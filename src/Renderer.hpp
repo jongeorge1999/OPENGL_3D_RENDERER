@@ -40,6 +40,8 @@ class Renderer {
         float deltaTime = 0.0f;
         float lastFrame = 0.0f;
 
+        glm::vec3 lightPos = glm::vec3(1.9f, 1.0f, 1.7f);
+
         //ImVec4 clear_color = ImVec4(0.0f, 0.0f, 0.0f, 1.00f);
         bool rotateModels = true;
         bool show_another_window = false;
@@ -62,7 +64,9 @@ class Renderer {
         float directionLightIntensity = 1.0f;
         float pointLightIntensity = 1.0f;
         unsigned int currSkybox = 0;
-
+        bool useBlinn = true;
+        bool gammaCorrection = false;
+        bool useShadows = true;
 
         void Render(GLFWwindow* window, Camera* camera, Controller* controller);
 
@@ -137,15 +141,6 @@ class Renderer {
             glDeleteTextures(1, &fb.texture);
             glDeleteRenderbuffers(1, &fb.renderbuffer);
         }
-
-        inline glm::quat rotate(float deltaTime, float spinSpeed, glm::quat objRotation) {
-            float angle = deltaTime * glm::radians(spinSpeed); // Incremental rotation angle
-            glm::quat incrementalRotation = glm::angleAxis(angle, glm::vec3(0.0f, 1.0f, 0.0f)); // Y-axis rotation
-            objRotation = incrementalRotation * objRotation; // Combine rotations
-            objRotation = glm::normalize(objRotation); // Normalize to avoid precision issues
-            return objRotation;
-        }
-
 
         // Helper function to set up VAO and VBO
         inline void setupVAOandVBO(unsigned int &VAO, unsigned int &VBO, 
