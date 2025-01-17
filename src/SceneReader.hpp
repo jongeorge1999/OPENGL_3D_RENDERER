@@ -11,28 +11,28 @@ class SceneReader {
     private:
         // positions of the point lights
         vector<glm::vec3> pointLightPositions = {
-            glm::vec3( 0.7f,  0.2f,  2.0f),
-            glm::vec3( 2.3f, 3.3f, -4.0f),
-            glm::vec3(-4.0f,  2.0f, -12.0f),
-            glm::vec3( -5.0f,  0.0f, -5.0f)
+            glm::vec3(-14.0f, 2.5f, -12.0f),
+            glm::vec3(-4.0f, 2.5f, -12.0f),
+            glm::vec3(6.0f,  2.5f, -12.0f),
+            glm::vec3(16.0f,  2.5f, -12.0f)
         };
 
         // transparent window locations
         vector<glm::vec3> windows {
-            glm::vec3(-1.5f, 0.0f, -0.48f),
-            glm::vec3( 1.5f, 0.0f, 0.51f),
-            glm::vec3( 0.0f, 0.0f, 0.7f),
-            glm::vec3(-0.3f, 0.0f, -2.3f),
-            glm::vec3( 0.5f, 0.0f, -0.6f)
+            glm::vec3(-12.5f, 0.0f, 0.5f),
+            glm::vec3(-12.5f, 0.0f, 1.0f),
+            glm::vec3(-12.5f, 0.0f, 1.5f),
+            glm::vec3(-12.5f, 0.0f, 2.0f),
+            glm::vec3(-12.5f, 0.0f, 2.5f)
         };
 
         // transparent vegetation locations
         std::vector<glm::vec3> vegetation {
-            glm::vec3(-3.5f, -0.4f, -4.48f),
-            glm::vec3( 3.5f, -0.4f, 4.51f),
-            glm::vec3( 1.0f, -0.4f, 4.7f),
-            glm::vec3(-1.3f, -0.4f, -3.3f),
-            glm::vec3 (6.5f, -0.4f, -5.6f)
+            glm::vec3(-7.5f, -0.4f, 0.5f),
+            glm::vec3(-7.5f, -0.4f, 1.0f),
+            glm::vec3(-7.5f, -0.4f, 1.4f),
+            glm::vec3(-7.5f, -0.4f, 2.0f),
+            glm::vec3(-7.5f, -0.4f, 2.5f)
         };
 
     public:

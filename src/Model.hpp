@@ -12,6 +12,7 @@
 
 #include "Mesh.hpp"
 #include "Shader.hpp"
+#include "Object.hpp"
 
 #include <string>
 #include <fstream>
@@ -36,9 +37,9 @@ class Model {
         Model(string const &path, bool gamma = false) : gammaCorrection(gamma) { loadModel(path); }
 
         // draws the model, and thus all its meshes
-        void Draw(Shader &shader) {
+        void Draw(Shader &shader, Object &object) {
             for(unsigned int i = 0; i < meshes.size(); i++) {
-                meshes[i].Draw(shader);
+                meshes[i].Draw(shader, object);
             }
         }
         

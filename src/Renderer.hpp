@@ -23,6 +23,8 @@ class Renderer {
         //screen width and height
         const unsigned int SCR_WIDTH = 2400;
         const unsigned int SCR_HEIGHT = 1800;
+        const unsigned int SHADOW_WIDTH = 4096;
+        const unsigned int SHADOW_HEIGHT = 4096;
 
         //Game object manager
         std::vector<Object*> objects;
@@ -65,8 +67,11 @@ class Renderer {
         float pointLightIntensity = 1.0f;
         unsigned int currSkybox = 0;
         bool useBlinn = true;
-        bool gammaCorrection = false;
+        bool gammaCorrection = true;
         bool useShadows = true;
+        bool showDepthMap = false;
+        int shadowItem = 24;
+        bool useMSAA = true;
 
         void Render(GLFWwindow* window, Camera* camera, Controller* controller);
 
@@ -131,6 +136,31 @@ class Renderer {
             if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
                 std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+            return fb;
+        }
+
+        inline Framebuffer createDepthMapBuffer() {
+            Framebuffer fb;
+
+            // configure depth map FBO
+            glGenFramebuffers(1, &fb.ID);
+            // create depth texture
+            unsigned int depthMap;
+            glGenTextures(1, &fb.texture);
+            glBindTexture(GL_TEXTURE_2D, fb.texture);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+            float borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
+            glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+            // attach depth texture as FBO's depth buffer
+            glBindFramebuffer(GL_FRAMEBUFFER, fb.ID);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, fb.texture, 0);
+            glDrawBuffer(GL_NONE);
+            glReadBuffer(GL_NONE);
 
             return fb;
         }
