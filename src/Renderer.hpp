@@ -25,6 +25,10 @@ class Renderer {
         const unsigned int SCR_HEIGHT = 1800;
         const unsigned int SHADOW_WIDTH = 4096;
         const unsigned int SHADOW_HEIGHT = 4096;
+        const unsigned int POINT_SHADOW_WIDTH = 1024;
+        const unsigned int POINT_SHADOW_HEIGHT = 1024;
+
+        const int NUM_POINT_LIGHTS = 4;
 
         //Game object manager
         std::vector<Object*> objects;
@@ -80,6 +84,63 @@ class Renderer {
             unsigned int texture;       // Texture attachment
             unsigned int renderbuffer;  // Renderbuffer attachment
         };
+        
+        unsigned int CopyTexture(GLuint srcTexture, GLenum target, int width, int height)
+        {
+            // Create a new texture
+            unsigned int dstTexture;
+            glGenTextures(1, &dstTexture);
+            glBindTexture(target, dstTexture);
+
+            // Copy the texture parameters
+            glBindTexture(target, srcTexture);
+            GLint wrapS, wrapT, minFilter, magFilter;
+            glGetTexParameteriv(target, GL_TEXTURE_WRAP_S, &wrapS);
+            glGetTexParameteriv(target, GL_TEXTURE_WRAP_T, &wrapT);
+            glGetTexParameteriv(target, GL_TEXTURE_MIN_FILTER, &minFilter);
+            glGetTexParameteriv(target, GL_TEXTURE_MAG_FILTER, &magFilter);
+            
+            glTexParameteri(target, GL_TEXTURE_WRAP_S, wrapS);
+            glTexParameteri(target, GL_TEXTURE_WRAP_T, wrapT);
+            glTexParameteri(target, GL_TEXTURE_MIN_FILTER, minFilter);
+            glTexParameteri(target, GL_TEXTURE_MAG_FILTER, magFilter);
+
+            // Copy the texture data
+            glTexImage2D(target, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+            glCopyImageSubData(srcTexture, GL_TEXTURE_2D, 0, 0, 0, 0,
+                            dstTexture, GL_TEXTURE_2D, 0, 0, 0, 0,
+                            width, height, 1);
+
+            glBindTexture(target, 0);
+
+            return dstTexture;
+        }
+
+        unsigned int CopyCubemap(unsigned int srcDepthCubemap, int width, int height) {
+            // Create a new depth cubemap
+            unsigned int dstDepthCubemap;
+            glGenTextures(1, &dstDepthCubemap);
+            glBindTexture(GL_TEXTURE_CUBE_MAP, dstDepthCubemap);
+
+            for (unsigned int i = 0; i < 6; ++i) {
+                glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_DEPTH_COMPONENT, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+            }
+
+            // Copy the depth data for all six faces
+            for (unsigned int i = 0; i < 6; ++i) {
+                glCopyImageSubData(
+                    srcDepthCubemap, GL_TEXTURE_CUBE_MAP, 0, 0, 0, i,
+                    dstDepthCubemap, GL_TEXTURE_CUBE_MAP, 0, 0, 0, i,
+                    width, height, 1
+                );
+            }
+
+            glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+            return dstDepthCubemap;
+        }
+
+
+
 
         inline Framebuffer createFramebuffer(int width, int height, GLenum textureFormat = GL_RGB, GLenum depthStencilFormat = GL_DEPTH24_STENCIL8) {
             Framebuffer fb;
@@ -161,6 +222,31 @@ class Renderer {
             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, fb.texture, 0);
             glDrawBuffer(GL_NONE);
             glReadBuffer(GL_NONE);
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+            return fb;
+        }
+
+        inline Framebuffer createDepthCubemapBuffer() {
+            Framebuffer fb;
+            glGenFramebuffers(1, &fb.ID);
+            // create depth cubemap texture
+            unsigned int depthCubemap;
+            glGenTextures(1, &fb.texture);
+            glBindTexture(GL_TEXTURE_CUBE_MAP, fb.texture);
+            for (unsigned int i = 0; i < 6; ++i)
+                glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_DEPTH_COMPONENT, POINT_SHADOW_WIDTH, POINT_SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+            glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+            // attach depth texture as FBO's depth buffer
+            glBindFramebuffer(GL_FRAMEBUFFER, fb.ID);
+            glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, fb.texture, 0);
+            glDrawBuffer(GL_NONE);
+            glReadBuffer(GL_NONE);
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
             return fb;
         }

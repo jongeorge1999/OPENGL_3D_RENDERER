@@ -58,6 +58,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     Shader normalShader("../src/shaders/normals.vert", "../src/shaders/normals.frag",  "../src/shaders/normals.geom");
     Shader depthShader("../src/shaders/depthShader.vert", "../src/shaders/depthShader.frag");
     Shader depthTestShader("../src/shaders/depthTestShader.vert", "../src/shaders/depthTestShader.frag");
+    Shader pointDepthShader("../src/shaders/pointDepthShader.vert", "../src/shaders/pointDepthShader.frag",  "../src/shaders/pointDepthShader.geom");
 
     // load models
     Model backpack_obj("../models/backpack/backpack.obj");
@@ -107,7 +108,13 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     Framebuffer framebuffer = createFramebuffer(SCR_WIDTH, SCR_HEIGHT);
     Framebuffer msaa = createMSAAFrameBuffer(SCR_WIDTH, SCR_HEIGHT);
     Framebuffer depthMapBuffer = createDepthMapBuffer();
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    Framebuffer pointLightsBuffers[NUM_POINT_LIGHTS];
+    // depth cube map
+    for (int i = 0; i < NUM_POINT_LIGHTS; i++) {
+        Framebuffer pointBuffer = createDepthCubemapBuffer();
+        pointLightsBuffers[i] = pointBuffer;
+    }
 
     // Initialize ImGui
     IMGUI_CHECKVERSION();
@@ -175,6 +182,39 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
 
+        // clear the buffers
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+        // create depth cubemap transformation matrices
+        float point_near_plane = 0.1f;
+        float point_far_plane = 25.0f;
+
+        // render scene to depth cubemap for each point light
+        for (int i = 0; i < NUM_POINT_LIGHTS; i++) {
+            glm::mat4 shadowProj = glm::perspective(glm::radians(90.0f), (float)POINT_SHADOW_WIDTH / (float)POINT_SHADOW_HEIGHT, point_near_plane, point_far_plane);
+            std::vector<glm::mat4> shadowTransforms;
+            shadowTransforms.push_back(shadowProj * glm::lookAt(sr.pointLightPositions[i], sr.pointLightPositions[i] + glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)));
+            shadowTransforms.push_back(shadowProj * glm::lookAt(sr.pointLightPositions[i], sr.pointLightPositions[i] + glm::vec3(-1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)));
+            shadowTransforms.push_back(shadowProj * glm::lookAt(sr.pointLightPositions[i], sr.pointLightPositions[i] + glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)));
+            shadowTransforms.push_back(shadowProj * glm::lookAt(sr.pointLightPositions[i], sr.pointLightPositions[i] + glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f)));
+            shadowTransforms.push_back(shadowProj * glm::lookAt(sr.pointLightPositions[i], sr.pointLightPositions[i] + glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, -1.0f, 0.0f)));
+            shadowTransforms.push_back(shadowProj * glm::lookAt(sr.pointLightPositions[i], sr.pointLightPositions[i] + glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, -1.0f, 0.0f)));
+            glViewport(0, 0, POINT_SHADOW_WIDTH, POINT_SHADOW_HEIGHT);
+            glBindFramebuffer(GL_FRAMEBUFFER, pointLightsBuffers[i].ID);
+            glClear(GL_DEPTH_BUFFER_BIT);
+            pointDepthShader.use();
+            for (unsigned int i = 0; i < 6; ++i) { pointDepthShader.setMat4("shadowMatrices[" + std::to_string(i) + "]", shadowTransforms[i]); }
+            pointDepthShader.setFloat("far_plane", point_far_plane);
+            pointDepthShader.setVec3("lightPos", sr.pointLightPositions[i]);
+            backpack_obj.Draw(pointDepthShader, backpack);
+            stormtrooper_obj.Draw(pointDepthShader, stormtrooper);
+            stormtrooper_obj.Draw(pointDepthShader, reflectiveST);
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+            glActiveTexture(GL_TEXTURE25 + i);
+            glBindTexture(GL_TEXTURE_CUBE_MAP, pointLightsBuffers[i].texture);
+        }
+
         // draw to non-default framebuffer
         if(renderToTexture && useMSAA) { glBindFramebuffer(GL_FRAMEBUFFER, msaa.ID); } else if (renderToTexture && !useMSAA) { glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.ID); }
         
@@ -184,10 +224,12 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         // setting a fuck ton of uniforms
         objectShader.use();
         sr.setParams(objectShader, *camera);
-        objectShader.setVec3("viewPos", camera->Position);
         objectShader.setVec3("lightPos", lightPos);
+        objectShader.setFloat("far_plane", point_far_plane);
         objectShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
         objectShader.setInt("shadowMap", shadowItem);
+        for (int i = 0; i < NUM_POINT_LIGHTS; i++) { objectShader.setVec3("pointLightPos[" + std::to_string(i) + "]", sr.pointLightPositions[i]); }
+        for (int i = 0; i < NUM_POINT_LIGHTS; i++) { objectShader.setInt("depthCubeMap[" + std::to_string(i) + "]", 25 + i); }
         
         // imgui uniforms
         objectShader.setBool("useAmbient", useAmbient);
@@ -218,7 +260,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         glDisable(GL_CULL_FACE);
         glBindVertexArray(lightVAO);
         vector<glm::vec3> pointLights = sr.getpointLights();
-        for (unsigned int i = 0; i < 4; i++) {
+        for (unsigned int i = 0; i < NUM_POINT_LIGHTS; i++) {
             glm::vec3 val;
             glGetUniformfv(objectShader.ID, glGetUniformLocation(objectShader.ID, std::format("pointLights[{}].diffuse", i).c_str()), glm::value_ptr(val));
             pointlightcube.setVec3("color", val);

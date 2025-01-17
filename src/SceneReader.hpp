@@ -9,13 +9,6 @@
 
 class SceneReader {    
     private:
-        // positions of the point lights
-        vector<glm::vec3> pointLightPositions = {
-            glm::vec3(-14.0f, 2.5f, -12.0f),
-            glm::vec3(-4.0f, 2.5f, -12.0f),
-            glm::vec3(6.0f,  2.5f, -12.0f),
-            glm::vec3(16.0f,  2.5f, -12.0f)
-        };
 
         // transparent window locations
         vector<glm::vec3> windows {
@@ -38,6 +31,15 @@ class SceneReader {
     public:
         SceneReader(){}
         ~SceneReader(){}
+
+        // positions of the point lights
+        vector<glm::vec3> pointLightPositions = {
+            glm::vec3(4.5f, 1.0f, -2.0f),
+            glm::vec3(-4.0f, 2.5f, -12.0f),
+            glm::vec3(6.0f,  2.5f, -12.0f),
+            glm::vec3(16.0f,  2.5f, -12.0f)
+        };
+
         void setParams(Shader objectShader, Camera camera) {
 
             // be sure to activate shader when setting uniforms/drawing objects
@@ -51,9 +53,9 @@ class SceneReader {
             objectShader.setVec3("dirLight.specular", 0.5f, 0.5f, 0.5f);
             // point light 1
             objectShader.setVec3("pointLights[0].position", pointLightPositions[0]);
-            objectShader.setVec3("pointLights[0].ambient", 0.05f, 0.00f, 0.00f);
+            objectShader.setVec3("pointLights[0].ambient", 0.05f, 0.0f, 0.0f);
             objectShader.setVec3("pointLights[0].diffuse", 1.0f, 0.0f, 0.0f);
-            objectShader.setVec3("pointLights[0].specular", 1.0f, 0.7f, 0.7f);
+            objectShader.setVec3("pointLights[0].specular", 0.5f, 0.0f, 0.0f);
             objectShader.setFloat("pointLights[0].constant", 1.0f);
             objectShader.setFloat("pointLights[0].linear", 0.09f);
             objectShader.setFloat("pointLights[0].quadratic", 0.032f);
