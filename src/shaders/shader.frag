@@ -6,6 +6,7 @@ uniform sampler2D shadowMap;
 struct Material {
     sampler2D diffuse;
     sampler2D specular;
+    sampler2D normal;
     float shininess;
 }; 
 
@@ -57,6 +58,10 @@ in vec3 FragPos;
 in vec3 Normal;
 in vec2 TexCoords;
 in vec4 FragPosLightSpace;
+in vec3 TangentLightPos;
+in vec3 TangentViewPos;
+in vec3 TangentFragPos;
+in mat3 TBN;
 
 uniform DirLight dirLight;
 uniform PointLight pointLights[NR_POINT_LIGHTS];
@@ -104,15 +109,19 @@ vec3 gridSamplingDisk[20] = vec3[]
 vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir);
 vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir, int index);
 vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir);
-float ShadowCalculation(vec4 fragPosLightSpace);
-float ShadowCalculation(vec3 fragPos, int index);
+float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal);
+float PointShadowCalculation(vec3 fragPos, int index, vec3 normal);
 
 void main() {    
     // properties
     vec3 norm = normalize(Normal);
     vec3 viewDir = normalize(viewPos - FragPos);
+    vec3 viewDirNormal = normalize(TangentViewPos - TangentFragPos); // normal mapping
     vec3 result = vec3(0.0);
     
+    // for normal mapping
+    vec3 normal = texture(material.diffuse, TexCoords).rgb;
+    normal = normalize(normal * 2.0 - 1.0);
 
     // directional lighting
     if(useDirectionalLight) {
@@ -139,13 +148,14 @@ void main() {
     }
 }
 
-float ShadowCalculation(vec4 fragPosLightSpace)
+float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal)
 {
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
     projCoords = projCoords * 0.5 + 0.5;
     float closestDepth = texture(shadowMap, projCoords.xy).r; 
     float currentDepth = projCoords.z;
-    vec3 normal = normalize(Normal);
+    normal = normalize(Normal);
+    //vec3 lightDir = normalize(TangentLightPos - TangentFragPos);
     vec3 lightDir = normalize(lightPos - FragPos);
     float bias = max(0.002 * (1.0 - dot(normal, lightDir)), 0.0005);
     float shadow = 0.0;
@@ -164,14 +174,16 @@ float ShadowCalculation(vec4 fragPosLightSpace)
     return shadow;
 }
 
-float PointShadowCalculation(vec3 fragPos, int index)
+float PointShadowCalculation(vec3 fragPos, int index, vec3 normal)
 {
     // get vector between fragment position and light position
     vec3 fragToLight = fragPos - pointLightPos[index];
+    //vec3 fragToLight = TBN * fragPos - TBN * pointLightPos[index];
     float currentDepth = length(fragToLight);
     float shadow = 0.0;
     float bias = 0.05;
     int samples = 20;
+    //float viewDistance = length(TBN * viewPos - TBN * fragPos);
     float viewDistance = length(viewPos - fragPos);
     float diskRadius = (1.0 + (viewDistance / far_plane)) / 25.0;
     for(int i = 0; i < samples; ++i)
@@ -188,8 +200,9 @@ float PointShadowCalculation(vec3 fragPos, int index)
 // calculates the color when using a directional light.
 vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir) {
     vec3 lightDir = normalize(-light.direction);
+    //vec3 lightDir = normalize(TangentLightPos - TangentFragPos); // normal mapping
     // diffuse shading
-    float diff = max(dot(normal, lightDir), 0.0);
+    float diff = max(dot(lightDir, normal), 0.0);
     // specular shading
     float spec = 0.0;
     if (useBlinn) {
@@ -208,8 +221,9 @@ vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir) {
     specular *= useSpecular ? 1 : 0;
     ambient *= useAmbient ? 1 : 0;
     if(useShadows) {
-        //return ambient + (1.0 - ShadowCalculation(FragPosLightSpace)) * (diffuse + specular);
-        return (texture(material.diffuse, TexCoords).rgb * (diffuse * (1.0 - ShadowCalculation(FragPosLightSpace)) + ambient) + texture(material.specular, TexCoords).r * specular  * (1.0 - ShadowCalculation(FragPosLightSpace))) * (dirLight.diffuse + dirLight.ambient + dirLight.specular);
+        return ambient + (1.0 - ShadowCalculation(FragPosLightSpace, normal)) * (diffuse + specular);
+        //return (ambient + diffuse + specular);
+        //return (texture(material.diffuse, TexCoords).rgb * (diffuse * (1.0 - ShadowCalculation(FragPosLightSpace)) + ambient) + texture(material.specular, TexCoords).r * specular  * (1.0 - ShadowCalculation(FragPosLightSpace))) * (dirLight.diffuse + dirLight.ambient + dirLight.specular);
     } else {
         return (ambient + diffuse + specular);
     }
@@ -218,6 +232,7 @@ vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir) {
 // calculates the color when using a point light.
 vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir, int index) {
     vec3 lightDir = normalize(light.position - fragPos);
+    //vec3 lightDir = normalize(TBN * light.position - TangentFragPos); // normal mapping
     // diffuse shading
     float diff = max(dot(normal, lightDir), 0.0);
     // specular shading
@@ -231,6 +246,7 @@ vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir, i
     }
     // attenuation
     float distance = length(light.position - fragPos);
+    //float distance = length(TBN * light.position - TangentFragPos);
     float attenuation = 1.0 / (light.constant + light.linear * distance + light.quadratic * (distance * distance));    
     // combine results
     vec3 ambient = light.ambient * vec3(texture(material.diffuse, TexCoords));
@@ -246,7 +262,7 @@ vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir, i
     if(useShadows) {
         //return ambient + (1.0 - ShadowCalculation(FragPosLightSpace)) * (diffuse + specular);
         //return (texture(material.diffuse, TexCoords).rgb * (diffuse * (1.0 - PointShadowCalculation(FragPos)) + ambient) + texture(material.specular, TexCoords).r * specular  * (1.0 - PointShadowCalculation(FragPos))) * (light.diffuse + light.ambient + light.specular);
-        return ambient + (1.0 - PointShadowCalculation(FragPos, index)) * (diffuse + specular);
+        return ambient + (1.0 - PointShadowCalculation(FragPos, index, normal)) * (diffuse + specular);
         //return (ambient + diffuse + specular);
     } else {
         return (ambient + diffuse + specular);

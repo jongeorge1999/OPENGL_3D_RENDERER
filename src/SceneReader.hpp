@@ -34,10 +34,14 @@ class SceneReader {
 
         // positions of the point lights
         vector<glm::vec3> pointLightPositions = {
-            glm::vec3(4.5f, 1.0f, -2.0f),
+            glm::vec3(-14.0f, 2.5f, -12.0f),
             glm::vec3(-4.0f, 2.5f, -12.0f),
             glm::vec3(6.0f,  2.5f, -12.0f),
             glm::vec3(16.0f,  2.5f, -12.0f)
+        };
+
+        std::vector<glm::vec3> NormalMapQuad {
+            glm::vec3(-7.5f, 0.5f, -6.5f),
         };
 
         void setParams(Shader objectShader, Camera camera) {
