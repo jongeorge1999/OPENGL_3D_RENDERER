@@ -9,9 +9,12 @@ out vec3 Normal;
 out vec2 TexCoords;
 out vec4 FragPosLightSpace;
 
+layout(std140) uniform Matrices {
+    mat4 projection;
+    mat4 view;
+};
+
 uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
 uniform bool useInstanceMatrix;
 uniform mat4 lightSpaceMatrix;
 

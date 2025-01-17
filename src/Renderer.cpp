@@ -38,7 +38,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     //texture flip
     stbi_set_flip_vertically_on_load(true);
 
-    // GL settings
+    // openGL settings
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_STENCIL_TEST);
     glEnable(GL_BLEND);
@@ -84,6 +84,25 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     setupVAOandVBO(quadVAO, quadVBO, ph.quadVertices, {2, 2}, 4);
     setupVAOandVBO(skyboxVAO, skyboxVBO, ph.skyboxVertices, {3}, 3);
 
+    //ubo
+    unsigned int uniformBlockObjectShader = glGetUniformBlockIndex(objectShader.ID, "Matrices");
+    glUniformBlockBinding(objectShader.ID, uniformBlockObjectShader, 0);
+    unsigned int uniformBlockReflectiveShader = glGetUniformBlockIndex(reflectiveShader.ID, "Matrices");
+    glUniformBlockBinding(reflectiveShader.ID, uniformBlockReflectiveShader, 0);
+    unsigned int uniformBlockPointLightCubeShader = glGetUniformBlockIndex(pointlightcube.ID, "Matrices");
+    glUniformBlockBinding(pointlightcube.ID, uniformBlockPointLightCubeShader, 0);
+    unsigned int uniformBlockGrassShader = glGetUniformBlockIndex(grassShader.ID, "Matrices");
+    glUniformBlockBinding(grassShader.ID, uniformBlockGrassShader, 0);
+    unsigned int uniformBlockTransparentShader = glGetUniformBlockIndex(transparentShader.ID, "Matrices");
+    glUniformBlockBinding(transparentShader.ID, uniformBlockTransparentShader, 0);
+
+    unsigned int uboMatrices;
+    glGenBuffers(1, &uboMatrices);
+    glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
+    glBufferData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::mat4), NULL, GL_STATIC_DRAW);
+    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+    glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboMatrices, 0, 2 * sizeof(glm::mat4));
+
     // framebuffers
     Framebuffer framebuffer = createFramebuffer(SCR_WIDTH, SCR_HEIGHT);
     Framebuffer msaa = createMSAAFrameBuffer(SCR_WIDTH, SCR_HEIGHT);
@@ -97,6 +116,13 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     ImGui::StyleColorsDark();
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 130");
+
+    // perspective (only needs to be set once unless you want to change projection)
+    glm::mat4 projection = glm::perspective(glm::radians(camera->Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+    glm::mat4 model;
+    glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
+    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection));
+    glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
     // MAIN RENDER LOOP
     while(!glfwWindowShouldClose(window)) {
@@ -115,6 +141,12 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         // wireframe
         if (wireFrame) { glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); } else { glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); }
 
+        // view
+        glm::mat4 view = camera->GetViewMatrix();
+        glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
+        glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(view));
+        glBindBuffer(GL_UNIFORM_BUFFER, 0);
+
         // sort the transparent windows
         vector<glm::vec3> windows = sr.getWindows();
         std::map<float, glm::vec3> sorted;
@@ -123,17 +155,14 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             sorted[distance] = windows[i];
         }
 
-
         //variables for shadowing
-        glm::mat4 lightProjection, lightView;
-        glm::mat4 lightSpaceMatrix;
+        glm::mat4 lightProjection, lightView, lightSpaceMatrix;
         float near_plane = 0.1f, far_plane = 25.0f;
         lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
         lightView = glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         lightSpaceMatrix = lightProjection * lightView;
-        glm::mat4 model;
 
-        // render scene from light's point of view
+        // render scene from light's point of view (first pass)
         glCullFace(GL_FRONT);
         depthShader.use();
         depthShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
@@ -144,19 +173,21 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         stormtrooper_obj.Draw(depthShader, stormtrooper);
         stormtrooper_obj.Draw(depthShader, reflectiveST);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
 
         // draw to non-default framebuffer
         if(renderToTexture && useMSAA) { glBindFramebuffer(GL_FRAMEBUFFER, msaa.ID); } else if (renderToTexture && !useMSAA) { glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.ID); }
-
-        // reset viewport
-        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
         
         // clear the buffers
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
-        // doing a lot of the work in the scene reader
+        // setting a fuck ton of uniforms
         objectShader.use();
         sr.setParams(objectShader, *camera);
+        objectShader.setVec3("viewPos", camera->Position);
+        objectShader.setVec3("lightPos", lightPos);
+        objectShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+        objectShader.setInt("shadowMap", shadowItem);
         
         // imgui uniforms
         objectShader.setBool("useAmbient", useAmbient);
@@ -171,42 +202,22 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         objectShader.setFloat("directionalLightIntensity", directionLightIntensity);
         objectShader.setFloat("pointLightIntensity", pointLightIntensity);
         objectShader.setBool("useShadows", useShadows);
-       
-        // setting the object transform
-        glm::mat4 projection = glm::perspective(glm::radians(camera->Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-        glm::mat4 view = camera->GetViewMatrix();
-        objectShader.setMat4("projection", projection);
-        objectShader.setMat4("view", view);
-        objectShader.setVec3("viewPos", camera->Position);
-        objectShader.setVec3("lightPos", lightPos);
-        objectShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
 
         //setting shadow texture
         glActiveTexture(GL_TEXTURE24);
         glBindTexture(GL_TEXTURE_2D, depthMapBuffer.texture);
-        objectShader.use();
-        objectShader.setInt("shadowMap", shadowItem);
 
         //render the objects normally (second pass)
         backpack_obj.Draw(objectShader, backpack);
         stormtrooper_obj.Draw(objectShader, stormtrooper);
         wood_floor_obj.Draw(objectShader, floor);
-
-        //render reflective stormtrooper model
-        reflectiveShader.use();
-        reflectiveShader.setMat4("projection", projection);
-        reflectiveShader.setMat4("view", view);
-        reflectiveShader.setInt("texture1", 0);
         stormtrooper_obj.Draw(reflectiveShader, reflectiveST);
 
-        // change to using the pointLightcube shader
+        // Pointlight cubes
         pointlightcube.use();
-        pointlightcube.setMat4("projection", projection);
-        pointlightcube.setMat4("view", view);
         glDisable(GL_CULL_FACE);
         glBindVertexArray(lightVAO);
         vector<glm::vec3> pointLights = sr.getpointLights();
-        // draw all the lamp objects for every light with correct color
         for (unsigned int i = 0; i < 4; i++) {
             glm::vec3 val;
             glGetUniformfv(objectShader.ID, glGetUniformLocation(objectShader.ID, std::format("pointLights[{}].diffuse", i).c_str()), glm::value_ptr(val));
@@ -218,17 +229,11 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             glDrawArrays(GL_TRIANGLES, 0, 36);
         }
 
-        glDisable(GL_CULL_FACE);
-
-        // switch to the grass shader
+        // Grass
         grassShader.use();
-        grassShader.setMat4("projection", projection);
-        grassShader.setMat4("view", view);
-        grassShader.setInt("texture1", 0);
         glBindVertexArray(grassVAO);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, grassTexture);
-        // draw vegetation
         vector<glm::vec3> vegetation = sr.getVegetation();
         for (unsigned int i = 0; i < vegetation.size(); i++) {
             model = glm::mat4(1.0f);
@@ -249,16 +254,11 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         glBindVertexArray(0);
         glDepthFunc(GL_LESS);
 
-
-        // switch to the transparency shader
+        // Windows
         transparentShader.use();
-        transparentShader.setMat4("projection", projection);
-        transparentShader.setMat4("view", view);
-        transparentShader.setInt("texture1", 0);
         glBindVertexArray(transparentVAO);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, transparentTexture);
-        // draw all the windows from furthest to nearest
         for (std::map<float, glm::vec3>::reverse_iterator it = sorted.rbegin(); it != sorted.rend(); ++it) {
             model = glm::mat4(1.0f);
             model = glm::translate(model, it->second);
@@ -304,7 +304,6 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         } else {
             glEnable(GL_DEPTH_TEST); // RE-ENABLE if not rendering to texture
         }
-
 
         // imgui
         ImGui_ImplOpenGL3_NewFrame();
@@ -442,6 +441,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     glDeleteBuffers(1, &grassVBO);
     glDeleteBuffers(1, &transparentVBO);
     glDeleteBuffers(1, &skyboxVBO);
+    glDeleteBuffers(1, &uboMatrices);
     deleteFramebuffer(framebuffer);
     deleteFramebuffer(msaa);
     deleteFramebuffer(depthMapBuffer);
