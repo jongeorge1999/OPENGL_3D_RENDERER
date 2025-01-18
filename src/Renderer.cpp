@@ -24,6 +24,7 @@
 
 void renderQuad();
 
+//MARK: Render
 void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller) {
     //create game objects
     Object stormtrooper("Stormtrooper", glm::vec3(4.0f, -0.9f, -2.5f));
@@ -31,6 +32,8 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     Object brickWall("Brick Wall", glm::vec3(-7.5f, 0.5f, -3.5f), glm::vec3(0.1f));
     Object floor("floor", glm::vec3(0.0f, -1.0f, 0.0f));
     Object reflectiveST("Reflective ST", glm::vec3(2.0f, 0.0f, 2.0f));
+    Object parallaxWall("Parallax Wall", glm::vec3(-14.5f, 0.5f, -3.5f), glm::vec3(0.1f));
+    Object parallaxToy("Parallax Toy", glm::vec3(-0.5f, 0.5f, -3.5f), glm::vec3(0.1f));
 
     //organize game objects
     objects.push_back(&stormtrooper);
@@ -38,6 +41,8 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     objects.push_back(&floor);
     objects.push_back(&reflectiveST);
     objects.push_back(&brickWall);
+    objects.push_back(&parallaxWall);
+    objects.push_back(&parallaxToy);
 
     //texture flip
     stbi_set_flip_vertically_on_load(true);
@@ -64,12 +69,15 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     Shader depthTestShader("../src/shaders/depthTestShader.vert", "../src/shaders/depthTestShader.frag");
     Shader pointDepthShader("../src/shaders/pointDepthShader.vert", "../src/shaders/pointDepthShader.frag",  "../src/shaders/pointDepthShader.geom");
     Shader normalMapShader("../src/shaders/normalMap.vert", "../src/shaders/normalMap.frag");
+    Shader parallaxShader("../src/shaders/parallaxMapping.vert", "../src/shaders/parallaxMapping.frag");
 
     // load models
     Model backpack_obj("../models/backpack/backpack.obj");
     Model stormtrooper_obj("../models/stormtrooper/stormtrooper.obj");
     Model wood_floor_obj("../models/wood_floor/wood_floor.obj");
-    Model brick_wall_obj("../models/brick_wall/wood_floor.obj");
+    Model brick_wall_obj("../models/brick_wall/brick_wall.obj");
+    Model parallax_wall_obj("../models/parallax_wall/parallax.obj");
+    Model parallax_toy_obj("../models/parallax_toy/parallax.obj");
 
     //load textures
     unsigned int transparentTexture = tl.loadTexture("../textures/red_window.png");
@@ -106,6 +114,8 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     glUniformBlockBinding(transparentShader.ID, uniformBlockTransparentShader, 0);
     unsigned int uniformBlockNormalMapShader = glGetUniformBlockIndex(normalMapShader.ID, "Matrices");
     glUniformBlockBinding(normalMapShader.ID, uniformBlockNormalMapShader, 0);
+    unsigned int uniformBlockParallaxMapShader = glGetUniformBlockIndex(parallaxShader.ID, "Matrices");
+    glUniformBlockBinding(parallaxShader.ID, uniformBlockParallaxMapShader, 0);
 
     unsigned int uboMatrices;
     glGenBuffers(1, &uboMatrices);
@@ -141,11 +151,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection));
     glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
-    normalMapShader.use();
-    normalMapShader.setInt("diffuseMap", 30);
-    normalMapShader.setInt("normalMap", 31);
-
-    // MAIN RENDER LOOP
+    // MARK: MAIN LOOP
     while(!glfwWindowShouldClose(window)) {
 
         //gamma correction
@@ -194,6 +200,8 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         stormtrooper_obj.Draw(depthShader, stormtrooper);
         stormtrooper_obj.Draw(depthShader, reflectiveST);
         brick_wall_obj.Draw(depthShader, brickWall);
+        parallax_wall_obj.Draw(depthShader, parallaxWall);
+        parallax_toy_obj.Draw(depthShader, parallaxToy);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
 
@@ -225,6 +233,8 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             stormtrooper_obj.Draw(pointDepthShader, stormtrooper);
             stormtrooper_obj.Draw(pointDepthShader, reflectiveST);
             brick_wall_obj.Draw(pointDepthShader, brickWall);
+            parallax_wall_obj.Draw(pointDepthShader, parallaxWall);
+            parallax_toy_obj.Draw(pointDepthShader, parallaxToy);
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
             glActiveTexture(GL_TEXTURE25 + i);
@@ -242,7 +252,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
 
-        // setting a fuck ton of uniforms
+        // MARK: UNIFORM HELL
         objectShader.use();
         sr.setParams(objectShader, *camera);
         objectShader.setVec3("lightPos", lightPos);
@@ -266,6 +276,8 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         objectShader.setFloat("pointLightIntensity", pointLightIntensity);
         objectShader.setBool("useShadows", useShadows);
         objectShader.setBool("useNormalMaps", useNormalMaps);
+        objectShader.setFloat("shadowFactor", shadowFactor);
+        objectShader.setBool("useSmoothShadows", useSmoothShadows);
 
         //render the objects normally (second pass)
         backpack_obj.Draw(objectShader, backpack);
@@ -273,6 +285,15 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         wood_floor_obj.Draw(objectShader, floor);
         brick_wall_obj.Draw(objectShader, brickWall);
         stormtrooper_obj.Draw(reflectiveShader, reflectiveST);
+        //parallax_wall_obj.Draw(objectShader, parallaxWall);
+
+        // parallax uniforms
+        parallaxShader.use();
+        parallaxShader.setVec3("lightPos", lightPos);
+        parallaxShader.setVec3("viewPos", camera->Position);
+        parallaxShader.setFloat("heightScale", 0.1f);
+        parallax_wall_obj.Draw(parallaxShader, parallaxWall);
+        parallax_toy_obj.Draw(parallaxShader, parallaxToy);
 
         // Pointlight cubes
         pointlightcube.use();
@@ -366,7 +387,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             glEnable(GL_DEPTH_TEST); // RE-ENABLE if not rendering to texture
         }
 
-        // imgui
+        // MARK: imgui
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
@@ -387,7 +408,9 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
                 ImGui::Checkbox("Use Directional Light?", &useDirectionalLight); 
                 ImGui::Checkbox("Use Point Light?", &usePointLight); 
                 ImGui::Checkbox("Use Shadows?", &useShadows);
+                ImGui::Checkbox("Use Smooth Shadows?", &useSmoothShadows);
                 ImGui::Checkbox("Use Normal Maps?", &useNormalMaps);
+                ImGui::SliderFloat("Shadow Blending", &shadowFactor, 0.0f, 1.0f);
                 static const char* light[] = { "red", "blue", "white", "green" };
                 static int selectedLight = 0;
 
@@ -499,6 +522,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         glfwPollEvents();    
     }
 
+    // MARK: CLEANUP
     // cleaning up after ourselves
     glDeleteVertexArrays(1, &lightVAO);
     glDeleteVertexArrays(1, &quadVAO);

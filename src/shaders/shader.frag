@@ -87,6 +87,10 @@ uniform bool useShadows;
 
 uniform bool useNormalMaps;
 
+uniform float shadowFactor;
+
+uniform bool useSmoothShadows;
+
 //depth testing
 uniform bool showDepthBuffer;
 float near = 0.1;
@@ -194,24 +198,39 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal)
 
 float PointShadowCalculation(vec3 fragPos, int index, vec3 normal)
 {
-    // get vector between fragment position and light position
-    vec3 fragToLight = fragPos - pointLightPos[index];
-    //vec3 fragToLight = TBN * fragPos - TBN * pointLightPos[index];
-    float currentDepth = length(fragToLight);
     float shadow = 0.0;
-    float bias = 0.05;
-    int samples = 20;
-    //float viewDistance = length(TBN * viewPos - TBN * fragPos);
-    float viewDistance = length(viewPos - fragPos);
-    float diskRadius = (1.0 + (viewDistance / far_plane)) / 25.0;
-    for(int i = 0; i < samples; ++i)
-    {
-        float closestDepth = texture(depthCubeMap[index], fragToLight + gridSamplingDisk[i] * diskRadius).r;
+    if(useSmoothShadows) {
+        // get vector between fragment position and light position
+        vec3 fragToLight = fragPos - pointLightPos[index];
+        //vec3 fragToLight = TBN * fragPos - TBN * pointLightPos[index];
+        float currentDepth = length(fragToLight);
+        float bias = 0.05;
+        int samples = 20;
+        //float viewDistance = length(TBN * viewPos - TBN * fragPos);
+        float viewDistance = length(viewPos - fragPos);
+        float diskRadius = (1.0 + (viewDistance / far_plane)) / 25.0;
+        for(int i = 0; i < samples; ++i)
+        {
+            float closestDepth = texture(depthCubeMap[index], fragToLight + gridSamplingDisk[i] * diskRadius).r;
+            closestDepth *= far_plane;
+            if(currentDepth - bias > closestDepth)
+                shadow += 1.0;
+        }
+        shadow /= float(samples);
+    } else {
+        // get vector between fragment position and light position
+        vec3 fragToLight = fragPos - pointLightPos[index];
+        // use the light to fragment vector to sample from the depth map    
+        float closestDepth = texture(depthCubeMap[index], fragToLight).r;
+        // it is currently in linear range between [0,1]. Re-transform back to original value
         closestDepth *= far_plane;
-        if(currentDepth - bias > closestDepth)
-            shadow += 1.0;
+        // now get current linear depth as the length between the fragment and light position
+        float currentDepth = length(fragToLight);
+        // now test for shadows
+        float bias = 0.05; 
+        shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
     }
-    shadow /= float(samples);
+
     return shadow;
 }
 
@@ -290,8 +309,18 @@ vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir, i
     if(useShadows) {
         //return ambient + (1.0 - ShadowCalculation(FragPosLightSpace)) * (diffuse + specular);
         //return (texture(material.diffuse, TexCoords).rgb * (diffuse * (1.0 - PointShadowCalculation(FragPos)) + ambient) + texture(material.specular, TexCoords).r * specular  * (1.0 - PointShadowCalculation(FragPos))) * (light.diffuse + light.ambient + light.specular);
-        return ambient + (1.0 - PointShadowCalculation(FragPos, index, normal)) * (diffuse + specular);
+        //return ambient + (1.0 - PointShadowCalculation(FragPos, index, normal)) * (diffuse + specular);
         //return (ambient + diffuse + specular);
+        // Calculate the shadow factor
+        float shadowFactorInt = 1.0 - PointShadowCalculation(FragPos, index, normal);
+
+        // Mix shadowed and unshadowed contributions
+        vec3 unshadowedColor = ambient + diffuse + specular;
+        vec3 shadowedColor = ambient + unshadowedColor * shadowFactor; // Darken the unshadowed color
+
+        // Interpolate based on shadow factor
+        vec3 finalColor = mix(shadowedColor, unshadowedColor, shadowFactorInt);
+        return finalColor;
     } else {
         return (ambient + diffuse + specular);
     }

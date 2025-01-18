@@ -25,8 +25,8 @@ class Renderer {
         const unsigned int SCR_HEIGHT = 1800;
         const unsigned int SHADOW_WIDTH = 4096;
         const unsigned int SHADOW_HEIGHT = 4096;
-        const unsigned int POINT_SHADOW_WIDTH = 1024;
-        const unsigned int POINT_SHADOW_HEIGHT = 1024;
+        const unsigned int POINT_SHADOW_WIDTH = 2048;
+        const unsigned int POINT_SHADOW_HEIGHT = 2048;
 
         const int NUM_POINT_LIGHTS = 4;
 
@@ -77,6 +77,8 @@ class Renderer {
         int shadowItem = 24;
         bool useMSAA = true;
         bool useNormalMaps = true;
+        float shadowFactor = 0.4;
+        bool useSmoothShadows = false;
 
         void Render(GLFWwindow* window, Camera* camera, Controller* controller);
 
