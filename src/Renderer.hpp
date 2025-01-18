@@ -46,7 +46,7 @@ class Renderer {
         float deltaTime = 0.0f;
         float lastFrame = 0.0f;
 
-        glm::vec3 lightPos = glm::vec3(1.9f, 1.0f, 1.7f);
+        glm::vec3 lightPos = glm::vec3(-17.35f, 12.35f, 14.55f);
 
         //ImVec4 clear_color = ImVec4(0.0f, 0.0f, 0.0f, 1.00f);
         bool rotateModels = true;
@@ -76,6 +76,7 @@ class Renderer {
         bool showDepthMap = false;
         int shadowItem = 24;
         bool useMSAA = true;
+        bool useNormalMaps = true;
 
         void Render(GLFWwindow* window, Camera* camera, Controller* controller);
 

@@ -51,7 +51,7 @@ class SceneReader {
             objectShader.setFloat("material.shininess", 32.0f);
 
             // directional light
-            objectShader.setVec3("dirLight.direction", -0.2f, -1.0f, -0.3f);
+            objectShader.setVec3("dirLight.direction", 20.0f, 0.0f, 20.0f);
             objectShader.setVec3("dirLight.ambient", 0.05f, 0.05f, 0.05f);
             objectShader.setVec3("dirLight.diffuse", 0.4f, 0.4f, 0.4f);
             objectShader.setVec3("dirLight.specular", 0.5f, 0.5f, 0.5f);
