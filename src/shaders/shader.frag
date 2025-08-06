@@ -91,6 +91,10 @@ uniform float shadowFactor;
 
 uniform bool useSmoothShadows;
 
+uniform float exposure;
+
+uniform float shadowBias;
+
 //depth testing
 uniform bool showDepthBuffer;
 float near = 0.1;
@@ -122,7 +126,13 @@ vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir);
 float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal);
 float PointShadowCalculation(vec3 fragPos, int index, vec3 normal);
 
-void main() {    
+void main() {
+
+    const float gamma = 2.2;
+    vec3 hdrColor = texture(texture_diffuse1, TexCoords).rgb;
+    vec3 mapped = vec3(1.0) - exp(-hdrColor * exposure);
+    mapped = pow(mapped, vec3(1.0 / gamma));
+
     // properties
     vec3 norm = normalize(Normal);
     vec3 viewDir = normalize(viewPos - FragPos);
@@ -160,7 +170,7 @@ void main() {
         //FragColor = vec4(result, 1.0);
         //float shadow = ShadowCalculation(fs_in.FragPosLightSpace);                      
        // vec3 lighting = (ambient + (1.0 - shadow) * (diffuse + specular)) * color;
-        FragColor = vec4(result, 1.0);
+        FragColor = vec4(result * mapped, 1.0);
         //vec3 worldNormal = normalize(TBN * normalMap);
         //vec3 visualNormal = worldNormal * 0.5 + 0.5; // Map to [0,1]
         //FragColor = vec4(normalMap,1.0);
@@ -204,7 +214,7 @@ float PointShadowCalculation(vec3 fragPos, int index, vec3 normal)
         vec3 fragToLight = fragPos - pointLightPos[index];
         //vec3 fragToLight = TBN * fragPos - TBN * pointLightPos[index];
         float currentDepth = length(fragToLight);
-        float bias = 0.05;
+        float bias = shadowBias;
         int samples = 20;
         //float viewDistance = length(TBN * viewPos - TBN * fragPos);
         float viewDistance = length(viewPos - fragPos);
@@ -227,7 +237,9 @@ float PointShadowCalculation(vec3 fragPos, int index, vec3 normal)
         // now get current linear depth as the length between the fragment and light position
         float currentDepth = length(fragToLight);
         // now test for shadows
-        float bias = 0.05; 
+        vec3 lightDir = normalize(pointLightPos[index] - fragPos);
+        // float bias = shadowBias; 
+        float bias = max(shadowBias * (1.0 - dot(normal, lightDir)), 0.005);
         shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
     }
 

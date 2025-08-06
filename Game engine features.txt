@@ -1,0 +1,23 @@
+Game engine features:
+
+-ImGui engine updates DONE
+	dockable panels
+	more engine like UI
+
+-ImGui Texture viewer window that shows all loaded textures and I can view them
+
+-Add button in imgui to create different primitives
+	-need to add them as a gameObject with a default name and shader
+	-be able to move them the same as any other gameObject
+
+-add mouse interaction, should be able to click things in the scene and select them
+	-add exis arrows for easier movement in the scene
+
+-add window resizing, should be able to resize windows
+	-add fullscreen mode with imgui button
+
+-save files
+	-store scene state in a file and be able to read it in as a scene
+
+-entity component system
+	-look into entt

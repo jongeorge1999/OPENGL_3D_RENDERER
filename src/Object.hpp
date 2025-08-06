@@ -18,9 +18,9 @@ private:
     }
 
 public:
-    Object(const std::string& objName = "", glm::vec3 objPos = glm::vec3(0.0f), glm::vec3 objScale = glm::vec3(1.0f))
+    Object(const std::string& objName = "", glm::vec3 objPos = glm::vec3(0.0f), glm::vec3 objScale = glm::vec3(1.0f), glm::quat objRot = glm::quat(1.0f, 0.0f, 0.0f, 0.0f))
         : position(objPos), 
-          rotation(glm::quat(1.0f, 0.0f, 0.0f, 0.0f)), 
+          rotation(objRot), 
           scale(objScale), modelMatrix(glm::mat4(1.0f)), 
           name(objName) 
           { 

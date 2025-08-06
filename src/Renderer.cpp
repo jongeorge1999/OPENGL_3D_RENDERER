@@ -10,6 +10,7 @@
 #include <imGui/imgui.h>
 #include <imGui/imgui_impl_glfw.h>
 #include <imGui/imgui_impl_opengl3.h>
+#include <imGui/imgui_internal.h>
 
 #include <iostream>
 #include <fstream>
@@ -34,6 +35,10 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     Object reflectiveST("Reflective ST", glm::vec3(2.0f, 0.0f, 2.0f));
     Object parallaxWall("Parallax Wall", glm::vec3(-14.5f, 0.5f, -3.5f), glm::vec3(0.1f));
     Object parallaxToy("Parallax Toy", glm::vec3(-0.5f, 0.5f, -3.5f), glm::vec3(0.1f));
+    Object wallLeft("WallLeft", glm::vec3(14.0f, 1.0f, -0.3f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)));
+    Object wallRight("WallRight", glm::vec3(18.0f, 1.0f, -0.3f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)));
+    Object wallTop("WallTop", glm::vec3(16.0f, 3.0f, -0.3f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 0.0f)));
+    Object wallBack("WallBack", glm::vec3(16.0f, 3.0f, -17.0f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(90.0f, 0.0f, 0.0f)));
 
     //organize game objects
     objects.push_back(&stormtrooper);
@@ -43,6 +48,10 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     objects.push_back(&brickWall);
     objects.push_back(&parallaxWall);
     objects.push_back(&parallaxToy);
+    objects.push_back(&wallLeft);
+    objects.push_back(&wallRight);
+    objects.push_back(&wallTop);
+    objects.push_back(&wallBack);
 
     //texture flip
     stbi_set_flip_vertically_on_load(true);
@@ -124,17 +133,20 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     glBindBuffer(GL_UNIFORM_BUFFER, 0);
     glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboMatrices, 0, 2 * sizeof(glm::mat4));
 
+    ImVec2 lastSceneSize = ImVec2(SCR_WIDTH, SCR_HEIGHT); // default value before ImGui updates it
+    int fbWidth = (int)lastSceneSize.x;
+    int fbHeight = (int)lastSceneSize.y;
+
     // framebuffers
     Framebuffer framebuffer = createFramebuffer(SCR_WIDTH, SCR_HEIGHT);
     Framebuffer msaa = createMSAAFrameBuffer(SCR_WIDTH, SCR_HEIGHT);
     Framebuffer depthMapBuffer = createDepthMapBuffer();
+    Framebuffer postProcessFramebuffer = createFramebuffer(fbWidth, fbHeight);
+
 
     Framebuffer pointLightsBuffers[NUM_POINT_LIGHTS];
     // depth cube map
-    for (int i = 0; i < NUM_POINT_LIGHTS; i++) {
-        Framebuffer pointBuffer = createDepthCubemapBuffer();
-        pointLightsBuffers[i] = pointBuffer;
-    }
+    for (int i = 0; i < NUM_POINT_LIGHTS; i++) { Framebuffer pointBuffer = createDepthCubemapBuffer(); pointLightsBuffers[i] = pointBuffer; }
 
     // Initialize ImGui
     IMGUI_CHECKVERSION();
@@ -143,6 +155,15 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     ImGui::StyleColorsDark();
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 130");
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;;
+    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+    ImGuiStyle& style = ImGui::GetStyle();
+    style.WindowPadding = ImVec2(0.0f, 0.0f);       // No inner window padding
+    style.WindowBorderSize = 0.0f;                  // No window borders
+    style.FramePadding = ImVec2(4.0f, 4.0f);         // Optional: tweak for buttons
+    style.ItemSpacing = ImVec2(4.0f, 4.0f);          // Optional: tweak for controls
+    style.TabBorderSize = 0.0f;                      // No border between tabs
+    style.WindowRounding = 0.0f;                     // Flat corners
 
     // perspective (only needs to be set once unless you want to change projection)
     glm::mat4 projection = glm::perspective(glm::radians(camera->Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
@@ -153,6 +174,9 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
 
     // MARK: MAIN LOOP
     while(!glfwWindowShouldClose(window)) {
+        glEnable(GL_CULL_FACE);  
+        glCullFace(GL_BACK); 
+        glFrontFace(GL_CCW); 
 
         //gamma correction
         if (gammaCorrection) {glEnable(GL_FRAMEBUFFER_SRGB);} else { glDisable(GL_FRAMEBUFFER_SRGB);}
@@ -164,6 +188,41 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
 
         //input
         controller->processInput(window, deltaTime, camera);
+
+        // Start new ImGui frame early so we can query the scene window size before rendering
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
+        // Get pointer to Scene window to get size, without rendering
+        ImGuiWindow* sceneWindow = ImGui::FindWindowByName("Scene");
+        if (sceneWindow) {
+            lastSceneSize = sceneWindow->ContentRegionRect.GetSize();
+        }
+
+        int newWidth = (int)lastSceneSize.x;
+        int newHeight = (int)lastSceneSize.y;
+
+        // Only reallocate if size changed
+        if (newWidth != fbWidth || newHeight != fbHeight) {
+            fbWidth = newWidth;
+            fbHeight = newHeight;
+
+            deleteFramebuffer(framebuffer);
+            deleteFramebuffer(msaa);
+            deleteFramebuffer(postProcessFramebuffer);
+
+            framebuffer = createFramebuffer(fbWidth, fbHeight);
+            msaa = createMSAAFrameBuffer(fbWidth, fbHeight);
+            postProcessFramebuffer = createFramebuffer(fbWidth, fbHeight);
+        }
+
+        // Update projection matrix to match ImGui Scene window size
+        float aspect = (float)fbWidth / (float)fbHeight;
+        glm::mat4 projection = glm::perspective(glm::radians(camera->Zoom), aspect, 0.1f, 100.0f);
+        glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
+        glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection));
+        glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
         // wireframe
         if (wireFrame) { glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); } else { glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); }
@@ -202,8 +261,8 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         brick_wall_obj.Draw(depthShader, brickWall);
         parallax_wall_obj.Draw(depthShader, parallaxWall);
         parallax_toy_obj.Draw(depthShader, parallaxToy);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.ID);
+        glViewport(0, 0, fbWidth, fbHeight);
 
         // clear the buffers
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
@@ -236,7 +295,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             parallax_wall_obj.Draw(pointDepthShader, parallaxWall);
             parallax_toy_obj.Draw(pointDepthShader, parallaxToy);
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
-            glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+            glViewport(0, 0, fbWidth, fbHeight);
             glActiveTexture(GL_TEXTURE25 + i);
             glBindTexture(GL_TEXTURE_CUBE_MAP, pointLightsBuffers[i].texture);
         }
@@ -246,7 +305,17 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         glBindTexture(GL_TEXTURE_2D, depthMapBuffer.texture);
 
         // draw to non-default framebuffer
-        if(renderToTexture && useMSAA) { glBindFramebuffer(GL_FRAMEBUFFER, msaa.ID); } else if (renderToTexture && !useMSAA) { glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.ID); }
+        // Only bind and clear the framebuffer if we're actually rendering to it
+        if (renderToTexture) {
+            if (useMSAA) {
+                glBindFramebuffer(GL_FRAMEBUFFER, msaa.ID);
+            } else {
+                glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.ID);
+            }
+        } else {
+            // Not rendering to texture — assume full-screen mode
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        }
         
         // clear the buffers
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
@@ -278,13 +347,20 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         objectShader.setBool("useNormalMaps", useNormalMaps);
         objectShader.setFloat("shadowFactor", shadowFactor);
         objectShader.setBool("useSmoothShadows", useSmoothShadows);
+        objectShader.setFloat("exposure", exposure);
+        objectShader.setFloat("shadowBias", shadowBias);
 
         //render the objects normally (second pass)
+        glCullFace(GL_BACK);
         backpack_obj.Draw(objectShader, backpack);
         stormtrooper_obj.Draw(objectShader, stormtrooper);
         wood_floor_obj.Draw(objectShader, floor);
         brick_wall_obj.Draw(objectShader, brickWall);
         stormtrooper_obj.Draw(reflectiveShader, reflectiveST);
+        wood_floor_obj.Draw(objectShader, wallLeft);
+        wood_floor_obj.Draw(objectShader, wallRight);
+        wood_floor_obj.Draw(objectShader, wallTop);
+        wood_floor_obj.Draw(objectShader, wallBack);
         //parallax_wall_obj.Draw(objectShader, parallaxWall);
 
         // parallax uniforms
@@ -352,7 +428,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         if(renderToTexture && useMSAA) {
             glBindFramebuffer(GL_READ_FRAMEBUFFER, msaa.ID);
             glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer.ID);
-            glBlitFramebuffer(0, 0, SCR_WIDTH, SCR_HEIGHT, 0, 0, SCR_WIDTH, SCR_HEIGHT, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+            glBlitFramebuffer(0, 0, fbWidth, fbHeight, 0, 0, fbWidth, fbHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST);
         }
 
         // showing the perspective of the dirLight for testing
@@ -368,9 +444,8 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
 
         // if rendering onto a quad
          if(renderToTexture && !showDepthMap) {
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glBindFramebuffer(GL_FRAMEBUFFER, postProcessFramebuffer.ID);
             glDisable(GL_DEPTH_TEST);
-            glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
             screenShader.use();
             screenShader.setBool("inverted", inverted);
@@ -380,7 +455,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             screenShader.setBool("edgeDetection", edgeDetection);
             glBindVertexArray(quadVAO);
             glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, framebuffer.texture);
+            glBindTexture(GL_TEXTURE_2D, framebuffer.texture); // color
             glDrawArrays(GL_TRIANGLES, 0, 6);
             glEnable(GL_DEPTH_TEST);
         } else {
@@ -388,134 +463,187 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         }
 
         // MARK: imgui
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-        {
-            static int counter = 0;
-            ImGui::Begin("George Engine Debug Menu");    
-            ImGui::Text("Debug controls"); 
+        // Set up fullscreen host window for DockSpace
+        ImGuiWindowFlags dockspace_window_flags = 0;
+        const ImGuiViewport* viewport = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(viewport->Pos);
+        ImGui::SetNextWindowSize(viewport->Size);
+        ImGui::SetNextWindowViewport(viewport->ID);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 
-            // Basic options
-            if (ImGui::TreeNode("Light Options"))
-            {
-                ImGui::Checkbox("Use Ambient?", &useAmbient);
-                ImGui::Checkbox("Use Diffuse?", &useDiffuse);  
-                ImGui::Checkbox("Use Specular?", &useSpecular); 
-                ImGui::Checkbox("Use blinn-phong?", &useBlinn); 
-                ImGui::Checkbox("Use Gamma Correction?", &gammaCorrection);
-                ImGui::Checkbox("Use Flashlight?", &useFlashlight);
-                ImGui::Checkbox("Use Directional Light?", &useDirectionalLight); 
-                ImGui::Checkbox("Use Point Light?", &usePointLight); 
-                ImGui::Checkbox("Use Shadows?", &useShadows);
-                ImGui::Checkbox("Use Smooth Shadows?", &useSmoothShadows);
-                ImGui::Checkbox("Use Normal Maps?", &useNormalMaps);
-                ImGui::SliderFloat("Shadow Blending", &shadowFactor, 0.0f, 1.0f);
-                static const char* light[] = { "red", "blue", "white", "green" };
-                static int selectedLight = 0;
-
-                if (ImGui::Combo("Light Selector", &selectedLight, light, IM_ARRAYSIZE(light)))
-                {
-                    // Combo logic here if needed (e.g., firing an event)
-                }
-
-                // Display the corresponding slider based on the selected light
-                if (selectedLight == 0) 
-                {
-                    ImGui::SliderFloat3("Light 1 Position", &sr.getpointLights()[0].x, -20.0f, 20.0f);
-                } 
-                else if (selectedLight == 1) 
-                {
-                    ImGui::SliderFloat3("Light 2 Position", &sr.getpointLights()[1].x, -20.0f, 20.0f);
-                }
-                else if (selectedLight == 2) 
-                {
-                    ImGui::SliderFloat3("Light 2 Position", &sr.getpointLights()[2].x, -20.0f, 20.0f);
-                }
-                else if (selectedLight == 3) 
-                {
-                    ImGui::SliderFloat3("Light 2 Position", &sr.getpointLights()[3].x, -20.0f, 20.0f);
-                }
-
-                //ImGui::ColorEdit3("clear color", (float*)&clear_color);
-                ImGui::SliderFloat("Flashlight Intensity", &flashlightIntensity, 0.0f, 4.0f);
-                ImGui::SliderFloat("Pointlight Intensity", &pointLightIntensity, 0.0f, 4.0f);
-                ImGui::SliderFloat("Directional Light Intensity", &directionLightIntensity, 0.0f, 4.0f);
-                ImGui::SliderFloat3("Direction Light Position (NOT ROTATION)", &lightPos.x, -20.0f, 20.0f);
-                ImGui::TreePop();
-            }
-
-            if (ImGui::TreeNode("Post-Processing Options"))
-            {
-                ImGui::Checkbox("Use MSAA?", &useMSAA);
-                ImGui::Checkbox("Show depth buffer?", &showDepthBuffer);
-                ImGui::Checkbox("wireframe?", &wireFrame);
-                ImGui::Checkbox("Render to texture?", &renderToTexture);
-                ImGui::Checkbox("invert?", &inverted);
-                ImGui::Checkbox("grayscale?", &grayscale);
-                ImGui::Checkbox("sharpen?", &sharpen);
-                ImGui::Checkbox("blur?", &blur);
-                ImGui::Checkbox("edge detection?", &edgeDetection);
-                ImGui::TreePop();
-            }
-
-            if (ImGui::TreeNode("Game objects"))
-            {
-                for(auto object : objects) {
-                    if (ImGui::TreeNode(object->getName().c_str()))
-                    {
-                        if (ImGui::SliderFloat3((object->getName() + " Position").c_str(), &object->getPosition().x, -20.0f, 20.0f)) {
-                            object->setPosition(object->getPosition());
-                        }
-
-                        static float scaleScalar = 1.0f;
-                        if (ImGui::SliderFloat((object->getName() + " Scale").c_str(), &scaleScalar, 0.1f, 10.0f)) {
-                            object->setScale(glm::vec3(scaleScalar, scaleScalar, scaleScalar)); 
-                        }
-
-                        // static glm::vec3 eulerRotation(0.0f, 0.0f, 0.0f);
-                        // if (ImGui::SliderFloat3((object->getName() + " Rotation").c_str(), &eulerRotation.x, -180.0f, 180.0f)) {
-                        //     glm::quat quatRotation = glm::quat(glm::radians(eulerRotation));
-                        //     object->setRotation(quatRotation);
-                        // }
-
-                        static glm::vec3 eulerRotation = glm::degrees(glm::eulerAngles(object->getRotation()));
-                        if (ImGui::InputFloat3((object->getName() + " Rotation").c_str(), &eulerRotation.x)) {
-                            glm::quat quatRotation = glm::quat(glm::radians(eulerRotation));
-                            object->setRotation(quatRotation);
-                        }
-                        ImGui::TreePop();
-                    }
-                }
-                ImGui::TreePop();
-            }
+        dockspace_window_flags |= ImGuiWindowFlags_NoTitleBar 
+                                | ImGuiWindowFlags_NoCollapse 
+                                | ImGuiWindowFlags_NoResize 
+                                | ImGuiWindowFlags_NoMove 
+                                | ImGuiWindowFlags_NoBringToFrontOnFocus 
+                                | ImGuiWindowFlags_NoNavFocus;
 
 
-            static const char* items[]{"Day","Night", "Space1", "Space2"};
-            static int Selecteditem = 4;
-            if (ImGui::Combo("Skybox Selector", &Selecteditem, items, IM_ARRAYSIZE(items)))
-            {
-                // Here event is fired
-                if(Selecteditem == 0) { currSkybox = cubemapTextureDay; }
-                else if(Selecteditem == 1) { currSkybox = cubemapTextureNight; }
-                else if(Selecteditem == 2) { currSkybox = cubemapTextureSpace1; }
-                else if(Selecteditem == 3) { currSkybox = cubemapTextureSpace2; }
-            }
+        //DOCKSPACE
+        ImGui::Begin("DockSpaceRoot", nullptr, dockspace_window_flags);
+        ImGui::PopStyleVar(3);
+        ImGuiID dockspace_id = ImGui::GetID("GeorgeDockspace");
+        ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_None;
+        ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
+        static bool first_time = true;
+        if (first_time) {
+            ImGui::DockBuilderRemoveNode(dockspace_id); // clear any existing layout
+            ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
+            ImGui::DockBuilderSetNodeSize(dockspace_id, viewport->Size);
 
-            ImGui::SliderInt("ShadowTexture", &shadowItem, 0, 36);
-            ImGui::Checkbox("Show Depth Map?", &showDepthMap);
+            // Split into left (scene) and right (debug)
+            ImGuiID dock_main_id = dockspace_id;
+            ImGuiID dock_right = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Right, 0.3f, nullptr, &dock_main_id);
+            ImGuiID dock_bottom = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Down, 0.3f, nullptr, &dock_main_id);
 
-            if (ImGui::Button("Close Application")) { glfwSetWindowShouldClose(window, true); }
+            // Assign windows to each side
+            ImGui::DockBuilderDockWindow("Scene", dock_main_id);
+            ImGui::DockBuilderDockWindow("George Engine Debug Menu", dock_right);
+            ImGui::DockBuilderDockWindow("Shadow Map", dock_bottom);
 
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-            ImGui::Text("CamX %0.1f CamY %0.1f CamZ %0.1f", camera->Position.x, camera->Position.y, camera->Position.z);
-            ImGui::Text("CamYaw %0.1f CamPitch %0.1f", std::fmod(camera->Yaw, 360), camera->Pitch);
-            ImGui::End();
-
-            // render the imgui window
-            ImGui::Render();
-            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+            ImGui::DockBuilderFinish(dockspace_id);
+            first_time = false;
         }
+        ImGui::End();
+
+        //SCENE WINDOW
+        static GLuint sceneFBO = 0, sceneTex = 0, sceneRBO = 0;
+        static int fbWidth = 2400, fbHeight = 1800;
+        ImGui::Begin("Scene", nullptr, ImGuiWindowFlags_None);
+        ImVec2 avail = ImGui::GetContentRegionAvail();
+        ImGui::Image((void*)(intptr_t)postProcessFramebuffer.texture, avail, ImVec2(0, 1), ImVec2(1, 0));
+        ImGui::End();
+
+        // SHADOW MAP VIEW WINDOW
+        ImGui::Begin("Shadow Map");
+        ImVec2 shadowSize = ImGui::GetContentRegionAvail();
+        ImGui::Image((void*)(intptr_t)depthMapBuffer.texture, shadowSize, ImVec2(0, 1), ImVec2(1, 0),
+             ImVec4(1,1,1,1), ImVec4(0,0,0,0));
+        ImGui::End();
+
+
+        //DEBUG WINDOW
+        static int counter = 0;
+        ImGui::Begin("George Engine Debug Menu", nullptr, ImGuiWindowFlags_None);  
+        ImGui::Text("Debug controls"); 
+
+        // Basic options
+        if (ImGui::TreeNode("Light Options"))
+        {
+            ImGui::Checkbox("Use Ambient?", &useAmbient);
+            ImGui::Checkbox("Use Diffuse?", &useDiffuse);  
+            ImGui::Checkbox("Use Specular?", &useSpecular); 
+            ImGui::Checkbox("Use blinn-phong?", &useBlinn); 
+            ImGui::Checkbox("Use Gamma Correction?", &gammaCorrection);
+            ImGui::Checkbox("Use Flashlight?", &useFlashlight);
+            ImGui::Checkbox("Use Directional Light?", &useDirectionalLight); 
+            ImGui::Checkbox("Use Point Light?", &usePointLight); 
+            ImGui::Checkbox("Use Shadows?", &useShadows);
+            ImGui::Checkbox("Use Smooth Shadows?", &useSmoothShadows);
+            ImGui::Checkbox("Use Normal Maps?", &useNormalMaps);
+            ImGui::SliderFloat("Shadow Blending", &shadowFactor, 0.0f, 1.0f);
+            ImGui::SliderFloat("Shadow Bias", &shadowBias, 0.0f, 0.2f);
+            static const char* light[] = { "red", "blue", "white", "green" };
+            static int selectedLight = 0;
+
+            if (ImGui::Combo("Light Selector", &selectedLight, light, IM_ARRAYSIZE(light)))
+            {
+                // Combo logic here if needed (e.g., firing an event)
+            }
+
+            // Display the corresponding slider based on the selected light
+            if (selectedLight == 0) 
+            {
+                ImGui::SliderFloat3("Light 1 Position", &sr.getpointLights()[0].x, -20.0f, 20.0f);
+            } 
+            else if (selectedLight == 1) 
+            {
+                ImGui::SliderFloat3("Light 2 Position", &sr.getpointLights()[1].x, -20.0f, 20.0f);
+            }
+            else if (selectedLight == 2) 
+            {
+                ImGui::SliderFloat3("Light 2 Position", &sr.getpointLights()[2].x, -20.0f, 20.0f);
+            }
+            else if (selectedLight == 3) 
+            {
+                ImGui::SliderFloat3("Light 2 Position", &sr.getpointLights()[3].x, -20.0f, 20.0f);
+            }
+
+            //ImGui::ColorEdit3("clear color", (float*)&clear_color);
+            ImGui::SliderFloat("Flashlight Intensity", &flashlightIntensity, 0.0f, 4.0f);
+            ImGui::SliderFloat("Pointlight Intensity", &pointLightIntensity, 0.0f, 4.0f);
+            ImGui::SliderFloat("Directional Light Intensity", &directionLightIntensity, 0.0f, 4.0f);
+            ImGui::SliderFloat3("Direction Light Position (NOT ROTATION)", &lightPos.x, -20.0f, 20.0f);
+            ImGui::TreePop();
+        }
+
+        if (ImGui::TreeNode("Post-Processing Options"))
+        {
+            ImGui::Checkbox("Use MSAA?", &useMSAA);
+            ImGui::Checkbox("Show depth buffer?", &showDepthBuffer);
+            ImGui::Checkbox("wireframe?", &wireFrame);
+            ImGui::Checkbox("Render to texture?", &renderToTexture);
+            ImGui::Checkbox("invert?", &inverted);
+            ImGui::Checkbox("grayscale?", &grayscale);
+            ImGui::Checkbox("sharpen?", &sharpen);
+            ImGui::Checkbox("blur?", &blur);
+            ImGui::Checkbox("edge detection?", &edgeDetection);
+            ImGui::SliderFloat("exposure", &exposure, 0.1, 1.0f);
+            ImGui::TreePop();
+        }
+
+        if (ImGui::TreeNode("Game objects"))
+        {
+            for(auto object : objects) {
+                if (ImGui::TreeNode(object->getName().c_str()))
+                {
+                    if (ImGui::SliderFloat3((object->getName() + " Position").c_str(), &object->getPosition().x, -20.0f, 20.0f)) {
+                        object->setPosition(object->getPosition());
+                    }
+
+                    static float scaleScalar = 1.0f;
+                    if (ImGui::SliderFloat((object->getName() + " Scale").c_str(), &scaleScalar, 0.1f, 10.0f)) {
+                        object->setScale(glm::vec3(scaleScalar, scaleScalar, scaleScalar)); 
+                    }
+                    static glm::vec3 eulerRotation = glm::degrees(glm::eulerAngles(object->getRotation()));
+                    if (ImGui::InputFloat3((object->getName() + " Rotation").c_str(), &eulerRotation.x)) {
+                        glm::quat quatRotation = eulerDegreesToQuat(eulerRotation);
+                        object->setRotation(quatRotation);
+                    }
+                    ImGui::TreePop();
+                }
+            }
+            ImGui::TreePop();
+        }
+
+
+        static const char* items[]{"Day","Night", "Space1", "Space2"};
+        static int Selecteditem = 4;
+        if (ImGui::Combo("Skybox Selector", &Selecteditem, items, IM_ARRAYSIZE(items)))
+        {
+            // Here event is fired
+            if(Selecteditem == 0) { currSkybox = cubemapTextureDay; }
+            else if(Selecteditem == 1) { currSkybox = cubemapTextureNight; }
+            else if(Selecteditem == 2) { currSkybox = cubemapTextureSpace1; }
+            else if(Selecteditem == 3) { currSkybox = cubemapTextureSpace2; }
+        }
+
+        ImGui::SliderInt("ShadowTexture", &shadowItem, 0, 36);
+        ImGui::Checkbox("Show Depth Map?", &showDepthMap);
+
+        if (ImGui::Button("Close Application")) { glfwSetWindowShouldClose(window, true); }
+
+        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+        ImGui::Text("CamX %0.1f CamY %0.1f CamZ %0.1f", camera->Position.x, camera->Position.y, camera->Position.z);
+        ImGui::Text("CamYaw %0.1f CamPitch %0.1f", std::fmod(camera->Yaw, 360), camera->Pitch);
+        ImGui::End();
+
+        // render the imgui window
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         // swap chain and IO handling
         glfwSwapBuffers(window);

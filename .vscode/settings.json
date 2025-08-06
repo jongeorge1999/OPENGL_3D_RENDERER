@@ -79,7 +79,9 @@
         "xutility": "cpp",
         "filesystem": "cpp",
         "forward_list": "cpp",
-        "set": "cpp"
+        "set": "cpp",
+        "ranges": "cpp",
+        "text_encoding": "cpp"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }
