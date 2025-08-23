@@ -39,7 +39,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     Object wallRight("WallRight", glm::vec3(18.0f, 1.0f, -0.3f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)));
     Object wallTop("WallTop", glm::vec3(16.0f, 3.0f, -0.3f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 0.0f)));
     Object wallBack("WallBack", glm::vec3(16.0f, 3.0f, -17.0f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(90.0f, 0.0f, 0.0f)));
-    Object wallTest("WallTest", glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.25f, 0.25f, 0.25f));
+    Object wallTest("WallTest", glm::vec3(0.0f, 1.0f, -15.0f), glm::vec3(0.25f, 0.25f, 0.25f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)));
 
     //organize game objects
     objects.push_back(&stormtrooper);
@@ -263,6 +263,12 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         brick_wall_obj.Draw(depthShader, brickWall);
         parallax_wall_obj.Draw(depthShader, parallaxWall);
         parallax_toy_obj.Draw(depthShader, parallaxToy);
+        wood_floor_obj.Draw(depthShader, wallTop);
+        wood_floor_obj.Draw(depthShader, wallBack);
+        wood_floor_obj.Draw(depthShader, wallLeft);
+        wood_floor_obj.Draw(depthShader, wallRight);
+        wood_floor_obj.Draw(depthShader, wallTest);
+        wood_floor_obj.Draw(depthShader, floor);
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.ID);
         glViewport(0, 0, fbWidth, fbHeight);
 
@@ -296,6 +302,12 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             brick_wall_obj.Draw(pointDepthShader, brickWall);
             parallax_wall_obj.Draw(pointDepthShader, parallaxWall);
             parallax_toy_obj.Draw(pointDepthShader, parallaxToy);
+            wood_floor_obj.Draw(pointDepthShader, wallTop);
+            wood_floor_obj.Draw(pointDepthShader, wallBack);
+            wood_floor_obj.Draw(pointDepthShader, wallLeft);
+            wood_floor_obj.Draw(pointDepthShader, wallRight);
+            wood_floor_obj.Draw(pointDepthShader, wallTest);
+            wood_floor_obj.Draw(pointDepthShader, floor);
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             glViewport(0, 0, fbWidth, fbHeight);
             glActiveTexture(GL_TEXTURE25 + i);
