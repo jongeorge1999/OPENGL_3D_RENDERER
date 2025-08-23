@@ -30,6 +30,14 @@ void renderQuad();
 
 //MARK: Render
 void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller) {
+    struct UIState {
+        Object* selected = nullptr;
+        int     selectedIndex = -1; // optional for convenience
+        char    filter[64] = "";
+        char    nameBuf[256] = {};
+        Object* nameBufOwner = nullptr; // which object nameBuf mirrors
+    } ui;
+
     // load shaders
     Shader objectShader("../src/shaders/shader.vert", "../src/shaders/shader.frag");
     Shader pointlightcube("../src/shaders/pointlightcube.vert", "../src/shaders/pointlightcube.frag");
@@ -464,11 +472,17 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             ImGuiID dock_main_id = dockspace_id;
             ImGuiID dock_right = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Right, 0.3f, nullptr, &dock_main_id);
             ImGuiID dock_bottom = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Down, 0.3f, nullptr, &dock_main_id);
+            ImGuiID dock_left = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Left, 0.3f, nullptr, &dock_main_id);
+            ImGuiID dock_right_inspector = ImGui::DockBuilderSplitNode(dock_right, ImGuiDir_Right, 0.50f, nullptr, &dock_right);
+
 
             // Assign windows to each side
             ImGui::DockBuilderDockWindow("Scene", dock_main_id);
-            ImGui::DockBuilderDockWindow("George Engine Debug Menu", dock_right);
-            ImGui::DockBuilderDockWindow("Shadow Map", dock_bottom);
+            ImGui::DockBuilderDockWindow("George Engine Debug Menu", dock_bottom);
+            //ImGui::DockBuilderDockWindow("Shadow Map", dock_right);
+            //ImGui::DockBuilderDockWindow("Inspector", dock_right);
+            ImGui::DockBuilderDockWindow("Hierarchy", dock_left);
+            ImGui::DockBuilderDockWindow("Inspector", dock_right_inspector);
 
             ImGui::DockBuilderFinish(dockspace_id);
             first_time = false;
@@ -484,11 +498,122 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         ImGui::End();
 
         // SHADOW MAP VIEW WINDOW
-        ImGui::Begin("Shadow Map");
-        ImVec2 shadowSize = ImGui::GetContentRegionAvail();
-        ImGui::Image((void*)(intptr_t)depthMapBuffer.texture, shadowSize, ImVec2(0, 1), ImVec2(1, 0),
-             ImVec4(1,1,1,1), ImVec4(0,0,0,0));
+        // ImGui::Begin("Shadow Map");
+        // ImVec2 shadowSize = ImGui::GetContentRegionAvail();
+        // ImGui::Image((void*)(intptr_t)depthMapBuffer.texture, shadowSize, ImVec2(0, 1), ImVec2(1, 0),
+        //      ImVec4(1,1,1,1), ImVec4(0,0,0,0));
+        // ImGui::End();
+
+        //inspector view window
+        // ImGui::Begin("Inspector");
+        // if (ImGui::Button("Close Application")) { glfwSetWindowShouldClose(window, true); }
+        // ImGui::End();
+
+        // --- HIERARCHY WINDOW ---
+        ImGui::Begin("Hierarchy");
+
+        // Filter bar (optional)
+        ImGui::InputTextWithHint("##filter", "Filter objects...", ui.filter, IM_ARRAYSIZE(ui.filter));
+        ImGui::Separator();
+
+        for (int i = 0; i < (int)objects.size(); ++i) {
+            Object* obj = objects[i];
+            const std::string& name = obj->getName();
+
+            // simple filter
+            if (ui.filter[0] != '\0' &&
+                name.find(ui.filter) == std::string::npos) {
+                continue;
+            }
+
+            bool isSelected = (ui.selected == obj);
+            if (ImGui::Selectable(name.c_str(), isSelected)) {
+                ui.selected      = obj;
+                ui.selectedIndex = i;
+
+                // Refresh the rename buffer for the newly selected object
+                std::snprintf(ui.nameBuf, sizeof(ui.nameBuf), "%s", obj->getName().c_str());
+                ui.nameBufOwner = obj;
+
+                ImGui::SetWindowFocus("Inspector");
+            }
+
+            if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {}
+        }
+
         ImGui::End();
+
+
+        // Inspector window
+        ImGui::Begin("Inspector");
+
+        if (!ui.selected) {
+            ImGui::TextUnformatted("No object selected.");
+            ImGui::End();
+        } else {
+            Object* obj = ui.selected;
+
+            // If selection changed externally, re-sync buffer
+            if (ui.nameBufOwner != obj) {
+                std::snprintf(ui.nameBuf, sizeof(ui.nameBuf), "%s", obj->getName().c_str());
+                ui.nameBufOwner = obj;
+            }
+
+            // Editable name
+            ImGuiInputTextFlags nameFlags =
+                ImGuiInputTextFlags_AutoSelectAll |
+                ImGuiInputTextFlags_EnterReturnsTrue;
+                //ImGuiInputTextFlags_CallbackCompletion; // optional
+
+            bool submitted = ImGui::InputText("Name", ui.nameBuf, IM_ARRAYSIZE(ui.nameBuf), nameFlags);
+            // Commit on Enter OR when the widget loses focus after an edit
+            if (submitted || (ImGui::IsItemDeactivatedAfterEdit())) {
+                // (Optional) trim whitespace
+                std::string newName = ui.nameBuf;
+                // simple trim:
+                auto l = newName.find_first_not_of(" \t\r\n");
+                auto r = newName.find_last_not_of(" \t\r\n");
+                if (l == std::string::npos) newName.clear();
+                else newName = newName.substr(l, r - l + 1);
+
+                if (!newName.empty() && newName != obj->getName()) {
+                    obj->setName(newName);
+
+                    // If you show names in the Hierarchy, they’ll reflect next frame automatically.
+                    // If you also keep maps keyed by name, update them here.
+                }
+            }
+
+            ImGui::Separator();
+
+            // …the rest of your inspector (position/rotation/scale)…
+            glm::vec3 pos = obj->getPosition();
+            if (ImGui::DragFloat3("Position", &pos.x, 0.05f)) obj->setPosition(pos);
+
+            glm::vec3 eulerDeg = glm::degrees(glm::eulerAngles(obj->getRotation()));
+            if (ImGui::DragFloat3("Rotation (deg)", &eulerDeg.x, 0.5f))
+                obj->setRotation(eulerDegreesToQuat(eulerDeg));
+
+            static float scaleScalar = 1.0f;
+            if (ImGui::DragFloat("Uniform Scale", &scaleScalar, 0.01f, 0.01f, 100.0f))
+                obj->setScale(glm::vec3(scaleScalar));
+
+            // (optional) quick actions
+            if (ImGui::Button("Center on Origin")) {
+                obj->setPosition(glm::vec3(0.0f));
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Reset Rotation")) {
+                obj->setRotation(eulerDegreesToQuat(glm::vec3(0.0f)));
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Reset Scale")) {
+                obj->setScale(glm::vec3(1.0f));
+                scaleScalar = 1.0f;
+            }
+
+            ImGui::End();
+        }
 
 
         //DEBUG WINDOW
@@ -568,30 +693,6 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             ImGui::Checkbox("blur?", &blur);
             ImGui::Checkbox("edge detection?", &edgeDetection);
             ImGui::SliderFloat("exposure", &exposure, 0.1, 1.0f);
-            ImGui::TreePop();
-        }
-
-        if (ImGui::TreeNode("Game objects"))
-        {
-            for(auto object : objects) {
-                if (ImGui::TreeNode(object->getName().c_str()))
-                {
-                    if (ImGui::SliderFloat3((object->getName() + " Position").c_str(), &object->getPosition().x, -20.0f, 20.0f)) {
-                        object->setPosition(object->getPosition());
-                    }
-
-                    static float scaleScalar = 1.0f;
-                    if (ImGui::SliderFloat((object->getName() + " Scale").c_str(), &scaleScalar, 0.1f, 10.0f)) {
-                        object->setScale(glm::vec3(scaleScalar, scaleScalar, scaleScalar)); 
-                    }
-                    static glm::vec3 eulerRotation = glm::degrees(glm::eulerAngles(object->getRotation()));
-                    if (ImGui::InputFloat3((object->getName() + " Rotation").c_str(), &eulerRotation.x)) {
-                        glm::quat quatRotation = eulerDegreesToQuat(eulerRotation);
-                        object->setRotation(quatRotation);
-                    }
-                    ImGui::TreePop();
-                }
-            }
             ImGui::TreePop();
         }
 

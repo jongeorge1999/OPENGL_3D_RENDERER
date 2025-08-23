@@ -90,5 +90,7 @@ public:
     string getName() {
         return name;
     }
+
+    void setName(const std::string& s) { name = s; }
 };
 
