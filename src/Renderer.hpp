@@ -82,6 +82,7 @@ class Renderer {
         float exposure = 1.0;
         float shadowBias = 0.05;
         float pointLightRadius = 25.0;
+        float dirShadowBias = 0.0;
 
         void Render(GLFWwindow* window, Camera* camera, Controller* controller);
 

@@ -363,6 +363,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         objectShader.setBool("useSmoothShadows", useSmoothShadows);
         objectShader.setFloat("exposure", exposure);
         objectShader.setFloat("shadowBias", shadowBias);
+        objectShader.setFloat("dirShadowBias", dirShadowBias);
         objectShader.setFloat("pointLightRadius", pointLightRadius);
 
         //render the objects normally (second pass)
@@ -561,6 +562,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             ImGui::Checkbox("Use Normal Maps?", &useNormalMaps);
             ImGui::SliderFloat("Shadow Blending", &shadowFactor, 0.0f, 1.0f);
             ImGui::SliderFloat("Shadow Bias", &shadowBias, 0.0f, 0.2f);
+            ImGui::SliderFloat("Dir. Shadow Bias", &dirShadowBias, 0.0f, 0.2f);
             ImGui::SliderFloat("Point Light Radius", &pointLightRadius, 0.0f, 100.0f);
             static const char* light[] = { "red", "blue", "white", "green" };
             static int selectedLight = 0;

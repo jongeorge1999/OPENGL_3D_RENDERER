@@ -94,6 +94,7 @@ uniform bool useSmoothShadows;
 uniform float exposure;
 
 uniform float shadowBias;
+uniform float dirShadowBias;
 
 uniform float pointLightRadius;
 
@@ -191,7 +192,7 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal)
     normal = normalize(Normal);
     //vec3 lightDir = normalize(TangentLightPos - TangentFragPos);
     vec3 lightDir = normalize(lightPos - FragPos);
-    float bias = max(0.002 * (1.0 - dot(normal, lightDir)), 0.0005);
+    float bias = max(0.0005 * (1.0 - dot(normal, lightDir)), dirShadowBias);
     float shadow = 0.0;
     vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
     for(int x = -1; x <= 1; ++x)
@@ -241,7 +242,7 @@ float PointShadowCalculation(vec3 fragPos, int index, vec3 normal)
         // now test for shadows
         vec3 lightDir = normalize(pointLightPos[index] - fragPos);
         // float bias = shadowBias; 
-        float bias = max(shadowBias * (1.0 - dot(normal, lightDir)), 0.005);
+        float bias = max(shadowBias * (1.0 - dot(normal, lightDir)), shadowBias);
         shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
     }
 
