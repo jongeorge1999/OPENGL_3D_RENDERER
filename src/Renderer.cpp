@@ -243,6 +243,20 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             sorted[distance] = windows[i];
         }
 
+        // --- animate directional light position in XZ circle ---
+        static bool  animateDirLight = true;    // toggle if you like (add to ImGui)
+        static float orbitSpeed      = 0.25f;   // radians per second
+        static float orbitRadius     = 32.0f;   // circle size
+        static glm::vec2 orbitCenter = {-16.0f, 16.0f}; // center (x,z)
+
+        if (animateDirLight) {
+            float t = glfwGetTime() * orbitSpeed;   // radians
+            float y = lightPos.y;                   // keep your current height
+            lightPos.x = orbitCenter.x + orbitRadius * std::cos(t);
+            lightPos.z = orbitCenter.y + orbitRadius * std::sin(t);
+            lightPos.y = y;
+        }
+
         //variables for shadowing
         glm::mat4 lightProjection, lightView, lightSpaceMatrix;
         float near_plane = 0.1f, far_plane = 100.0f;
@@ -555,7 +569,17 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             ImGui::Checkbox("Use blinn-phong?", &useBlinn); 
             ImGui::Checkbox("Use Gamma Correction?", &gammaCorrection);
             ImGui::Checkbox("Use Flashlight?", &useFlashlight);
-            ImGui::Checkbox("Use Directional Light?", &useDirectionalLight); 
+            if(ImGui::TreeNode("Directional Light Options")) 
+            {
+                ImGui::Checkbox("Use Directional Light?", &useDirectionalLight); 
+                ImGui::Checkbox("Animate Dir Light", &animateDirLight);
+                ImGui::SliderFloat("Dir Orbit Speed", &orbitSpeed, 0.0f, 2.0f);
+                ImGui::SliderFloat("Dir Orbit Radius", &orbitRadius, 0.0f, 128.0f);
+                ImGui::SliderFloat2("Dir Orbit Center (x,z)", &orbitCenter.x, -64.0f, 64.0f);
+                ImGui::SliderFloat3("Direction Light Position (NOT ROTATION)", &lightPos.x, -20.0f, 20.0f);
+                ImGui::SliderFloat("Directional Light Intensity", &directionLightIntensity, 0.0f, 4.0f);
+                ImGui::TreePop();
+            }
             ImGui::Checkbox("Use Point Light?", &usePointLight); 
             ImGui::Checkbox("Use Shadows?", &useShadows);
             ImGui::Checkbox("Use Smooth Shadows?", &useSmoothShadows);
@@ -593,8 +617,6 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             //ImGui::ColorEdit3("clear color", (float*)&clear_color);
             ImGui::SliderFloat("Flashlight Intensity", &flashlightIntensity, 0.0f, 4.0f);
             ImGui::SliderFloat("Pointlight Intensity", &pointLightIntensity, 0.0f, 4.0f);
-            ImGui::SliderFloat("Directional Light Intensity", &directionLightIntensity, 0.0f, 4.0f);
-            ImGui::SliderFloat3("Direction Light Position (NOT ROTATION)", &lightPos.x, -20.0f, 20.0f);
             ImGui::TreePop();
         }
 
