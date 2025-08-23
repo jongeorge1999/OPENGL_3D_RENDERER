@@ -25,3 +25,5 @@ Features:
 -skyboxes
 
 -reflection cubemaps
+
+-Transparency
