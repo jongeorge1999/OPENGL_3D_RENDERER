@@ -39,6 +39,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     Object wallRight("WallRight", glm::vec3(18.0f, 1.0f, -0.3f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)));
     Object wallTop("WallTop", glm::vec3(16.0f, 3.0f, -0.3f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 0.0f)));
     Object wallBack("WallBack", glm::vec3(16.0f, 3.0f, -17.0f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(90.0f, 0.0f, 0.0f)));
+    Object wallTest("WallTest", glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.25f, 0.25f, 0.25f));
 
     //organize game objects
     objects.push_back(&stormtrooper);
@@ -52,6 +53,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     objects.push_back(&wallRight);
     objects.push_back(&wallTop);
     objects.push_back(&wallBack);
+    objects.push_back(&wallTest);
 
     //texture flip
     stbi_set_flip_vertically_on_load(true);
@@ -349,6 +351,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         objectShader.setBool("useSmoothShadows", useSmoothShadows);
         objectShader.setFloat("exposure", exposure);
         objectShader.setFloat("shadowBias", shadowBias);
+        objectShader.setFloat("pointLightRadius", pointLightRadius);
 
         //render the objects normally (second pass)
         glCullFace(GL_BACK);
@@ -361,6 +364,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         wood_floor_obj.Draw(objectShader, wallRight);
         wood_floor_obj.Draw(objectShader, wallTop);
         wood_floor_obj.Draw(objectShader, wallBack);
+        wood_floor_obj.Draw(objectShader, wallTest);
         //parallax_wall_obj.Draw(objectShader, parallaxWall);
 
         // parallax uniforms
@@ -545,6 +549,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             ImGui::Checkbox("Use Normal Maps?", &useNormalMaps);
             ImGui::SliderFloat("Shadow Blending", &shadowFactor, 0.0f, 1.0f);
             ImGui::SliderFloat("Shadow Bias", &shadowBias, 0.0f, 0.2f);
+            ImGui::SliderFloat("Point Light Radius", &pointLightRadius, 0.0f, 100.0f);
             static const char* light[] = { "red", "blue", "white", "green" };
             static int selectedLight = 0;
 

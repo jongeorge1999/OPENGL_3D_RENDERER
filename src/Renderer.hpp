@@ -67,7 +67,7 @@ class Renderer {
         bool edgeDetection = false;
         float spinSpeed = 0.0f;
         float flashlightIntensity = 1.0f;
-        float directionLightIntensity = 1.0f;
+        float directionLightIntensity = 0.1f;
         float pointLightIntensity = 1.0f;
         unsigned int currSkybox = 0;
         bool useBlinn = true;
@@ -78,9 +78,10 @@ class Renderer {
         bool useMSAA = true;
         bool useNormalMaps = true;
         float shadowFactor = 0.4;
-        bool useSmoothShadows = false;
+        bool useSmoothShadows = true;
         float exposure = 1.0;
         float shadowBias = 0.05;
+        float pointLightRadius = 25.0;
 
         void Render(GLFWwindow* window, Camera* camera, Controller* controller);
 

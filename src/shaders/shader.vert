@@ -27,19 +27,25 @@ uniform vec3 viewPos;
 
 void main()
 {
-    // Transform position and normal
-    FragPos = vec3(model * vec4(aPos, 1.0));   
+    // World-space position
+    FragPos = vec3(model * vec4(aPos, 1.0));
     TexCoords = aTexCoords;
-    Normal = aNormal;
+    
+    // Properly transform normal
+    mat3 normalMatrix = transpose(inverse(mat3(model)));
+    Normal = normalize(normalMatrix * aNormal);
+
+    // Shadow mapping position
     FragPosLightSpace = lightSpaceMatrix * vec4(FragPos, 1.0);
     
-    mat3 normalMatrix = transpose(inverse(mat3(model)));
+    // Build TBN matrix with corrected basis vectors
     vec3 T = normalize(normalMatrix * aTangent);
-    vec3 N = normalize(normalMatrix * aNormal);
+    vec3 N = Normal;
     T = normalize(T - dot(T, N) * N);
     vec3 B = cross(N, T);
     
-    mat3 TBN = transpose(mat3(T, B, N));    
+    TBN = transpose(mat3(T, B, N));    
+    
     TangentLightPos = TBN * lightPos;
     TangentViewPos  = TBN * viewPos;
     TangentFragPos  = TBN * FragPos;

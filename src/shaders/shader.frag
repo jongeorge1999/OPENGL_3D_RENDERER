@@ -95,6 +95,8 @@ uniform float exposure;
 
 uniform float shadowBias;
 
+uniform float pointLightRadius;
+
 //depth testing
 uniform bool showDepthBuffer;
 float near = 0.1;
@@ -218,7 +220,7 @@ float PointShadowCalculation(vec3 fragPos, int index, vec3 normal)
         int samples = 20;
         //float viewDistance = length(TBN * viewPos - TBN * fragPos);
         float viewDistance = length(viewPos - fragPos);
-        float diskRadius = (1.0 + (viewDistance / far_plane)) / 25.0;
+        float diskRadius = (1.0 + (viewDistance / far_plane)) / pointLightRadius;
         for(int i = 0; i < samples; ++i)
         {
             float closestDepth = texture(depthCubeMap[index], fragToLight + gridSamplingDisk[i] * diskRadius).r;
