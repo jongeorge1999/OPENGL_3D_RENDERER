@@ -19,54 +19,17 @@
 #include <cstring>
 #include <format>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+#undef STB_IMAGE_IMPLEMENTATION
+
 #include "Renderer.hpp"
-#include "Model.hpp"
 #include "Shader.hpp"
 
 void renderQuad();
 
 //MARK: Render
 void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller) {
-    //create game objects
-    Object stormtrooper("Stormtrooper", glm::vec3(4.0f, -0.9f, -2.5f));
-    Object backpack("backpack", glm::vec3(-9.5f, 0.1f, 1.5f), glm::vec3(0.5f));
-    Object brickWall("Brick Wall", glm::vec3(-7.5f, 0.5f, -3.5f), glm::vec3(0.1f));
-    Object floor("floor", glm::vec3(0.0f, -1.0f, 0.0f));
-    Object reflectiveST("Reflective ST", glm::vec3(2.0f, 0.0f, 2.0f));
-    Object parallaxWall("Parallax Wall", glm::vec3(-14.5f, 0.5f, -3.5f), glm::vec3(0.1f));
-    Object parallaxToy("Parallax Toy", glm::vec3(-0.5f, 0.5f, -3.5f), glm::vec3(0.1f));
-    Object wallLeft("WallLeft", glm::vec3(14.0f, 1.0f, -0.3f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)));
-    Object wallRight("WallRight", glm::vec3(18.0f, 1.0f, -0.3f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)));
-    Object wallTop("WallTop", glm::vec3(16.0f, 3.0f, -0.3f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 0.0f)));
-    Object wallBack("WallBack", glm::vec3(16.0f, 3.0f, -17.0f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(90.0f, 0.0f, 0.0f)));
-    Object wallTest("WallTest", glm::vec3(0.0f, 1.0f, -15.0f), glm::vec3(0.25f, 0.25f, 0.25f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)));
-
-    //organize game objects
-    objects.push_back(&stormtrooper);
-    objects.push_back(&backpack);
-    objects.push_back(&floor);
-    objects.push_back(&reflectiveST);
-    objects.push_back(&brickWall);
-    objects.push_back(&parallaxWall);
-    objects.push_back(&parallaxToy);
-    objects.push_back(&wallLeft);
-    objects.push_back(&wallRight);
-    objects.push_back(&wallTop);
-    objects.push_back(&wallBack);
-    objects.push_back(&wallTest);
-
-    //texture flip
-    stbi_set_flip_vertically_on_load(true);
-
-    // openGL settings
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_STENCIL_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glEnable(GL_CULL_FACE);  
-    glCullFace(GL_BACK); 
-    glFrontFace(GL_CCW); 
-
     // load shaders
     Shader objectShader("../src/shaders/shader.vert", "../src/shaders/shader.frag");
     Shader pointlightcube("../src/shaders/pointlightcube.vert", "../src/shaders/pointlightcube.frag");
@@ -82,13 +45,29 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     Shader normalMapShader("../src/shaders/normalMap.vert", "../src/shaders/normalMap.frag");
     Shader parallaxShader("../src/shaders/parallaxMapping.vert", "../src/shaders/parallaxMapping.frag");
 
-    // load models
-    Model backpack_obj("../models/backpack/backpack.obj");
-    Model stormtrooper_obj("../models/stormtrooper/stormtrooper.obj");
-    Model wood_floor_obj("../models/wood_floor/wood_floor.obj");
-    Model brick_wall_obj("../models/brick_wall/brick_wall.obj");
-    Model parallax_wall_obj("../models/parallax_wall/parallax.obj");
-    Model parallax_toy_obj("../models/parallax_toy/parallax.obj");
+
+    //create game objects
+    Object stormtrooper(&objectShader, "../models/stormtrooper/stormtrooper.obj", &objects, "Stormtrooper", glm::vec3(4.0f, -0.9f, -2.5f));
+    Object backpack(&objectShader, "../models/backpack/backpack.obj", &objects, "backpack", glm::vec3(-9.5f, 0.1f, 1.5f), glm::vec3(0.5f));
+    Object brickWall(&objectShader, "../models/brick_wall/brick_wall.obj", &objects, "Brick Wall", glm::vec3(-7.5f, 0.5f, -3.5f), glm::vec3(0.1f));
+    Object floor(&objectShader, "../models/wood_floor/wood_floor.obj", &objects, "floor", glm::vec3(0.0f, -1.0f, 0.0f));
+    Object reflectiveST(&reflectiveShader, "../models/stormtrooper/stormtrooper.obj", &objects, "Reflective ST", glm::vec3(2.0f, 0.0f, 2.0f));
+    Object parallaxWall(&parallaxShader, "../models/parallax_wall/parallax.obj", &objects, "Parallax Wall", glm::vec3(-14.5f, 0.5f, -3.5f), glm::vec3(0.1f));
+    Object parallaxToy(&parallaxShader, "../models/parallax_toy/parallax.obj", &objects, "Parallax Toy", glm::vec3(-0.5f, 0.5f, -3.5f), glm::vec3(0.1f));
+    Object wallLeft(&objectShader, "../models/wood_floor/wood_floor.obj", &objects, "WallLeft", glm::vec3(14.0f, 1.0f, -0.3f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)));
+    Object wallRight(&objectShader, "../models/wood_floor/wood_floor.obj", &objects, "WallRight", glm::vec3(18.0f, 1.0f, -0.3f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)));
+    Object wallTop(&objectShader, "../models/wood_floor/wood_floor.obj", &objects, "WallTop", glm::vec3(16.0f, 3.0f, -0.3f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 0.0f)));
+    Object wallBack(&objectShader, "../models/wood_floor/wood_floor.obj", &objects, "WallBack", glm::vec3(16.0f, 3.0f, -17.0f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(90.0f, 0.0f, 0.0f)));
+    Object wallTest(&objectShader, "../models/wood_floor/wood_floor.obj", &objects, "WallTest", glm::vec3(0.0f, 1.0f, -15.0f), glm::vec3(0.25f, 0.25f, 0.25f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)));
+
+    // openGL settings
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_STENCIL_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_CULL_FACE);  
+    glCullFace(GL_BACK); 
+    glFrontFace(GL_CCW); 
 
     //load textures
     unsigned int transparentTexture = tl.loadTexture("../textures/red_window.png");
@@ -198,9 +177,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
 
         // Get pointer to Scene window to get size, without rendering
         ImGuiWindow* sceneWindow = ImGui::FindWindowByName("Scene");
-        if (sceneWindow) {
-            lastSceneSize = sceneWindow->ContentRegionRect.GetSize();
-        }
+        if (sceneWindow) {lastSceneSize = sceneWindow->ContentRegionRect.GetSize();}
 
         int newWidth = (int)lastSceneSize.x;
         int newHeight = (int)lastSceneSize.y;
@@ -271,18 +248,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         glBindFramebuffer(GL_FRAMEBUFFER, depthMapBuffer.ID);
         glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
         glClear(GL_DEPTH_BUFFER_BIT);
-        backpack_obj.Draw(depthShader, backpack);
-        stormtrooper_obj.Draw(depthShader, stormtrooper);
-        stormtrooper_obj.Draw(depthShader, reflectiveST);
-        brick_wall_obj.Draw(depthShader, brickWall);
-        parallax_wall_obj.Draw(depthShader, parallaxWall);
-        parallax_toy_obj.Draw(depthShader, parallaxToy);
-        wood_floor_obj.Draw(depthShader, wallTop);
-        wood_floor_obj.Draw(depthShader, wallBack);
-        wood_floor_obj.Draw(depthShader, wallLeft);
-        wood_floor_obj.Draw(depthShader, wallRight);
-        wood_floor_obj.Draw(depthShader, wallTest);
-        wood_floor_obj.Draw(depthShader, floor);
+        for (Object* obj : objects) {obj->Draw(depthShader);}
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.ID);
         glViewport(0, 0, fbWidth, fbHeight);
 
@@ -310,18 +276,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             for (unsigned int i = 0; i < 6; ++i) { pointDepthShader.setMat4("shadowMatrices[" + std::to_string(i) + "]", shadowTransforms[i]); }
             pointDepthShader.setFloat("far_plane", point_far_plane);
             pointDepthShader.setVec3("lightPos", sr.pointLightPositions[i]);
-            backpack_obj.Draw(pointDepthShader, backpack);
-            stormtrooper_obj.Draw(pointDepthShader, stormtrooper);
-            stormtrooper_obj.Draw(pointDepthShader, reflectiveST);
-            brick_wall_obj.Draw(pointDepthShader, brickWall);
-            parallax_wall_obj.Draw(pointDepthShader, parallaxWall);
-            parallax_toy_obj.Draw(pointDepthShader, parallaxToy);
-            wood_floor_obj.Draw(pointDepthShader, wallTop);
-            wood_floor_obj.Draw(pointDepthShader, wallBack);
-            wood_floor_obj.Draw(pointDepthShader, wallLeft);
-            wood_floor_obj.Draw(pointDepthShader, wallRight);
-            wood_floor_obj.Draw(pointDepthShader, wallTest);
-            wood_floor_obj.Draw(pointDepthShader, floor);
+            for (Object* obj : objects) {obj->Draw(pointDepthShader);}
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             glViewport(0, 0, fbWidth, fbHeight);
             glActiveTexture(GL_TEXTURE25 + i);
@@ -335,15 +290,9 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         // draw to non-default framebuffer
         // Only bind and clear the framebuffer if we're actually rendering to it
         if (renderToTexture) {
-            if (useMSAA) {
-                glBindFramebuffer(GL_FRAMEBUFFER, msaa.ID);
-            } else {
-                glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.ID);
-            }
-        } else {
-            // Not rendering to texture — assume full-screen mode
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        }
+            if (useMSAA) {glBindFramebuffer(GL_FRAMEBUFFER, msaa.ID);} 
+            else {glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.ID);}
+        } else { glBindFramebuffer(GL_FRAMEBUFFER, 0);}
         
         // clear the buffers
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
@@ -380,27 +329,14 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         objectShader.setFloat("dirShadowBias", dirShadowBias);
         objectShader.setFloat("pointLightRadius", pointLightRadius);
 
-        //render the objects normally (second pass)
-        glCullFace(GL_BACK);
-        backpack_obj.Draw(objectShader, backpack);
-        stormtrooper_obj.Draw(objectShader, stormtrooper);
-        wood_floor_obj.Draw(objectShader, floor);
-        brick_wall_obj.Draw(objectShader, brickWall);
-        stormtrooper_obj.Draw(reflectiveShader, reflectiveST);
-        wood_floor_obj.Draw(objectShader, wallLeft);
-        wood_floor_obj.Draw(objectShader, wallRight);
-        wood_floor_obj.Draw(objectShader, wallTop);
-        wood_floor_obj.Draw(objectShader, wallBack);
-        wood_floor_obj.Draw(objectShader, wallTest);
-        //parallax_wall_obj.Draw(objectShader, parallaxWall);
-
-        // parallax uniforms
         parallaxShader.use();
         parallaxShader.setVec3("lightPos", lightPos);
         parallaxShader.setVec3("viewPos", camera->Position);
         parallaxShader.setFloat("heightScale", 0.1f);
-        parallax_wall_obj.Draw(parallaxShader, parallaxWall);
-        parallax_toy_obj.Draw(parallaxShader, parallaxToy);
+
+        //render the objects normally (second pass)
+        glCullFace(GL_BACK);
+        for (Object* obj : objects) {obj->Draw();}
 
         // Pointlight cubes
         pointlightcube.use();

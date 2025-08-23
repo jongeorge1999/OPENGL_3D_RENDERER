@@ -1,14 +1,11 @@
 #pragma once
-
-#include <glad/glad.h> // holds all OpenGL type declarations
-
+#include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-
-#include <../src/Shader.hpp>
-
+#include "Shader.hpp"
 #include <string>
 #include <vector>
+
 using namespace std;
 
 #define MAX_BONE_INFLUENCE 4
@@ -55,9 +52,9 @@ class Mesh {
         }
 
         // render the mesh
-        void Draw(Shader &shader, Object &object) {
+        void Draw(Shader &shader, glm::mat4 object) {
             shader.use();
-            shader.setMat4("model", object.getModelMatrix());
+            shader.setMat4("model", object);
             // bind appropriate textures
             unsigned int diffuseNr  = 1;
             unsigned int specularNr = 1;

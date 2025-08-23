@@ -4,15 +4,12 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
 #include "Mesh.hpp"
-#include "Shader.hpp"
-#include "Object.hpp"
 
 #include <string>
 #include <fstream>
@@ -20,9 +17,12 @@
 #include <iostream>
 #include <map>
 #include <vector>
+
+class Shader;
+
 using namespace std;
 
-unsigned int TextureFromFile(const char *path, const string &directory, bool gamma = false);
+inline unsigned int TextureFromFile(const char *path, const string &directory, bool gamma = false);
 
 class Model {
     public:
@@ -37,7 +37,7 @@ class Model {
         Model(string const &path, bool gamma = false) : gammaCorrection(gamma) { loadModel(path); }
 
         // draws the model, and thus all its meshes
-        void Draw(Shader &shader, Object &object) {
+        void Draw(Shader &shader, glm::mat4 object) {
             for(unsigned int i = 0; i < meshes.size(); i++) {
                 meshes[i].Draw(shader, object);
             }
@@ -194,6 +194,7 @@ unsigned int TextureFromFile(const char *path, const string &directory, bool gam
     glGenTextures(1, &textureID);
 
     int width, height, nrComponents;
+    stbi_set_flip_vertically_on_load(1);
     unsigned char *data = stbi_load(filename.c_str(), &width, &height, &nrComponents, 0);
     if (data) {
         GLenum format;
