@@ -6,9 +6,9 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtx/quaternion.hpp> // for glm::mat4_cast
+#include <glm/gtx/quaternion.hpp>
 
-class Shader; // forward-declare only if you have methods taking Shader&
+class Shader;
 
 using namespace std;
 
@@ -20,7 +20,6 @@ private:
     glm::mat4 modelMatrix;
     std::string name;
     std::vector<Object*>* objects;
-    //const std::string& path;
     Model model;
     Shader* shaderStored;
 
@@ -44,12 +43,11 @@ public:
           shaderStored(shaderIn)
           { 
             updateModelMatrix();
-            //model = Model(modelPath);
             vec->push_back(this);
         }
 
     glm::vec3& getPosition() { 
-        return position; // Return a copy (const behavior)
+        return position;
     }
 
     void Draw(Shader shader) {
@@ -71,7 +69,7 @@ public:
 
     void setRotation(const glm::quat& newRotation) {
         rotation = newRotation;
-        updateModelMatrix(); // Update modelMatrix
+        updateModelMatrix();
     }
 
     glm::vec3& getScale() {
@@ -80,11 +78,15 @@ public:
 
     void setScale(const glm::vec3& newScale) {
         scale = newScale;
-        updateModelMatrix(); // Update modelMatrix
+        updateModelMatrix();
     }
 
     glm::mat4 getModelMatrix() const {
-        return modelMatrix; // Return the latest model matrix
+        return modelMatrix;
+    }
+
+    void setModelMatrix(glm::mat4 matrix) {
+        modelMatrix = matrix;
     }
 
     string getName() {

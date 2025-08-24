@@ -4,7 +4,6 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-// Defines several possible options for camera movement. Used as abstraction to stay away from window-system specific input methods
 enum Camera_Movement {
     FORWARD,
     BACKWARD,
@@ -14,15 +13,12 @@ enum Camera_Movement {
     DOWN
 };
 
-// Default camera values
 const float YAW         = -90.0f;
 const float PITCH       =  0.0f;
 const float SPEED       =  2.5f;
 const float SENSITIVITY =  0.1f;
 const float ZOOM        =  45.0f;
 
-
-// An abstract camera class that processes input and calculates the corresponding Euler Angles, Vectors and Matrices for use in OpenGL
 class Camera {
 public:
     // camera Attributes
@@ -38,6 +34,36 @@ public:
     float MovementSpeed;
     float MouseSensitivity;
     float Zoom;
+    float Near = 0.1f;
+    float Far  = 100.0f;
+    bool UseOrtho = false;
+    float OrthoHeight = 20.0f; 
+
+
+    glm::mat4 GetProjectionMatrix(float viewportWidth, float viewportHeight) const {
+        float aspect = viewportWidth / glm::max(1.0f, viewportHeight);
+        #if defined(GLM_FORCE_DEPTH_ZERO_TO_ONE)
+            return UseOrtho
+                ? orthoMatrix(aspect) 
+                : glm::perspectiveRH_ZO(glm::radians(Zoom), aspect, Near, Far);
+        #else
+            return UseOrtho
+                ? orthoMatrix(aspect)
+                : glm::perspective(glm::radians(Zoom), aspect, Near, Far);
+        #endif
+    }
+
+    glm::mat4 GetProjectionMatrix(float aspect) const {
+        #if defined(GLM_FORCE_DEPTH_ZERO_TO_ONE)
+            return UseOrtho
+                ? orthoMatrix(aspect)
+                : glm::perspectiveRH_ZO(glm::radians(Zoom), aspect, Near, Far);
+        #else
+            return UseOrtho
+                ? orthoMatrix(aspect)
+                : glm::perspective(glm::radians(Zoom), aspect, Near, Far);
+        #endif
+    }
 
     // constructor with vectors
     Camera(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f), float yaw = YAW, float pitch = PITCH) : Front(glm::vec3(0.0f, 0.0f, -1.0f)), MovementSpeed(SPEED), MouseSensitivity(SENSITIVITY), Zoom(ZOOM) {
@@ -125,5 +151,16 @@ private:
         // also re-calculate the Right and Up vector
         Right = glm::normalize(glm::cross(Front, WorldUp));  // normalize the vectors, because their length gets closer to 0 the more you look up or down which results in slower movement.
         Up    = glm::normalize(glm::cross(Right, Front));
+    }
+
+
+    glm::mat4 orthoMatrix(float aspect) const {
+        float halfH = OrthoHeight * 0.5f;
+        float halfW = halfH * aspect;
+        #if defined(GLM_FORCE_DEPTH_ZERO_TO_ONE)
+            return glm::orthoRH_ZO(-halfW, halfW, -halfH, halfH, Near, Far);
+        #else
+            return glm::ortho(-halfW, halfW, -halfH, halfH, Near, Far);
+        #endif
     }
 };

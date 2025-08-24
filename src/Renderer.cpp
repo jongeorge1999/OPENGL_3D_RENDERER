@@ -6,12 +6,14 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/string_cast.hpp>
+#include <glm/gtx/matrix_decompose.hpp>
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imGui/imgui.h>
 #include <imGui/imgui_impl_glfw.h>
 #include <imGui/imgui_impl_opengl3.h>
 #include <imGui/imgui_internal.h>
+#include <imGui/ImGuizmo.h>
 
 #include <iostream>
 #include <fstream>
@@ -29,15 +31,24 @@
 
 void renderQuad();
 
+static ImGuizmo::OPERATION gizmoOp  = ImGuizmo::TRANSLATE;
+static ImGuizmo::MODE      gizmoMode= ImGuizmo::WORLD;
+static bool useSnap = false;
+static float snapTranslate[3] = {0.5f, 0.5f, 0.5f};
+static float snapRotateDeg    = 15.0f;
+static float snapScale[3]     = {0.1f, 0.1f, 0.1f};
+
+//UI State Machine
+struct UIState {
+    Object* selected = nullptr;
+    int     selectedIndex = -1;
+    char    filter[64] = "";
+    char    nameBuf[256] = {};
+    Object* nameBufOwner = nullptr;
+} ui;
+
 //MARK: Render
 void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller) {
-    struct UIState {
-        Object* selected = nullptr;
-        int     selectedIndex = -1; // optional for convenience
-        char    filter[64] = "";
-        char    nameBuf[256] = {};
-        Object* nameBufOwner = nullptr; // which object nameBuf mirrors
-    } ui;
 
     // load shaders
     Shader objectShader("../src/shaders/shader.vert", "../src/shaders/shader.frag");
@@ -123,7 +134,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     glBindBuffer(GL_UNIFORM_BUFFER, 0);
     glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboMatrices, 0, 2 * sizeof(glm::mat4));
 
-    ImVec2 lastSceneSize = ImVec2(SCR_WIDTH, SCR_HEIGHT); // default value before ImGui updates it
+    ImVec2 lastSceneSize = ImVec2(SCR_WIDTH, SCR_HEIGHT);
     int fbWidth = (int)lastSceneSize.x;
     int fbHeight = (int)lastSceneSize.y;
 
@@ -148,12 +159,12 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;;
     io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
     ImGuiStyle& style = ImGui::GetStyle();
-    style.WindowPadding = ImVec2(0.0f, 0.0f);       // No inner window padding
-    style.WindowBorderSize = 0.0f;                  // No window borders
-    style.FramePadding = ImVec2(4.0f, 4.0f);         // Optional: tweak for buttons
-    style.ItemSpacing = ImVec2(4.0f, 4.0f);          // Optional: tweak for controls
-    style.TabBorderSize = 0.0f;                      // No border between tabs
-    style.WindowRounding = 0.0f;                     // Flat corners
+    style.WindowPadding = ImVec2(0.0f, 0.0f);       
+    style.WindowBorderSize = 0.0f;                
+    style.FramePadding = ImVec2(4.0f, 4.0f); 
+    style.ItemSpacing = ImVec2(4.0f, 4.0f);     
+    style.TabBorderSize = 0.0f;   
+    style.WindowRounding = 0.0f;  
 
     // perspective (only needs to be set once unless you want to change projection)
     glm::mat4 projection = glm::perspective(glm::radians(camera->Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
@@ -183,23 +194,17 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
-
-        // Get pointer to Scene window to get size, without rendering
+        ImGuizmo::BeginFrame();
         ImGuiWindow* sceneWindow = ImGui::FindWindowByName("Scene");
         if (sceneWindow) {lastSceneSize = sceneWindow->ContentRegionRect.GetSize();}
-
         int newWidth = (int)lastSceneSize.x;
         int newHeight = (int)lastSceneSize.y;
-
-        // Only reallocate if size changed
         if (newWidth != fbWidth || newHeight != fbHeight) {
             fbWidth = newWidth;
             fbHeight = newHeight;
-
             deleteFramebuffer(framebuffer);
             deleteFramebuffer(msaa);
             deleteFramebuffer(postProcessFramebuffer);
-
             framebuffer = createFramebuffer(fbWidth, fbHeight);
             msaa = createMSAAFrameBuffer(fbWidth, fbHeight);
             postProcessFramebuffer = createFramebuffer(fbWidth, fbHeight);
@@ -229,15 +234,15 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             sorted[distance] = windows[i];
         }
 
-        // --- animate directional light position in XZ circle ---
-        static bool  animateDirLight = true;    // toggle if you like (add to ImGui)
-        static float orbitSpeed      = 0.25f;   // radians per second
-        static float orbitRadius     = 32.0f;   // circle size
-        static glm::vec2 orbitCenter = {-16.0f, 16.0f}; // center (x,z)
+        // dirLight Anim
+        static bool  animateDirLight = true; 
+        static float orbitSpeed      = 0.25f;
+        static float orbitRadius     = 32.0f;
+        static glm::vec2 orbitCenter = {-16.0f, 16.0f};
 
         if (animateDirLight) {
-            float t = glfwGetTime() * orbitSpeed;   // radians
-            float y = lightPos.y;                   // keep your current height
+            float t = glfwGetTime() * orbitSpeed;
+            float y = lightPos.y;              
             lightPos.x = orbitCenter.x + orbitRadius * std::cos(t);
             lightPos.z = orbitCenter.y + orbitRadius * std::sin(t);
             lightPos.y = y;
@@ -465,23 +470,18 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
         static bool first_time = true;
         if (first_time) {
-            ImGui::DockBuilderRemoveNode(dockspace_id); // clear any existing layout
+            ImGui::DockBuilderRemoveNode(dockspace_id);
             ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
             ImGui::DockBuilderSetNodeSize(dockspace_id, viewport->Size);
 
-            // Split into left (scene) and right (debug)
             ImGuiID dock_main_id = dockspace_id;
             ImGuiID dock_right = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Right, 0.3f, nullptr, &dock_main_id);
             ImGuiID dock_bottom = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Down, 0.3f, nullptr, &dock_main_id);
             ImGuiID dock_left = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Left, 0.3f, nullptr, &dock_main_id);
             ImGuiID dock_right_inspector = ImGui::DockBuilderSplitNode(dock_right, ImGuiDir_Right, 0.50f, nullptr, &dock_right);
 
-
-            // Assign windows to each side
             ImGui::DockBuilderDockWindow("Scene", dock_main_id);
             ImGui::DockBuilderDockWindow("George Engine Debug Menu", dock_bottom);
-            //ImGui::DockBuilderDockWindow("Shadow Map", dock_right);
-            //ImGui::DockBuilderDockWindow("Inspector", dock_right);
             ImGui::DockBuilderDockWindow("Hierarchy", dock_left);
             ImGui::DockBuilderDockWindow("Inspector", dock_right_inspector);
 
@@ -490,12 +490,100 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         }
         ImGui::End();
 
-        //SCENE WINDOW
-        static GLuint sceneFBO = 0, sceneTex = 0, sceneRBO = 0;
-        static int fbWidth = 2400, fbHeight = 1800;
         ImGui::Begin("Scene", nullptr, ImGuiWindowFlags_None);
-        ImVec2 avail = ImGui::GetContentRegionAvail();
-        ImGui::Image((void*)(intptr_t)postProcessFramebuffer.texture, avail, ImVec2(0, 1), ImVec2(1, 0));
+        const float toolbarH = ImGui::GetFrameHeightWithSpacing();
+        ImGui::BeginChild("##Toolbar", ImVec2(0, toolbarH), false, ImGuiWindowFlags_NoScrollbar);
+
+        ImGui::TextUnformatted("Gizmo:");
+        ImGui::SameLine();
+        if (ImGui::RadioButton("Translate", gizmoOp == ImGuizmo::TRANSLATE)) gizmoOp = ImGuizmo::TRANSLATE;
+        ImGui::SameLine();
+        if (ImGui::RadioButton("Rotate", gizmoOp == ImGuizmo::ROTATE)) gizmoOp = ImGuizmo::ROTATE;
+        ImGui::SameLine();
+        if (ImGui::RadioButton("Scale", gizmoOp == ImGuizmo::SCALE)) gizmoOp = ImGuizmo::SCALE;
+
+        ImGui::SameLine();
+        ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+        ImGui::SameLine();
+        if (ImGui::RadioButton("World", gizmoMode == ImGuizmo::WORLD)) gizmoMode = ImGuizmo::WORLD;
+        ImGui::SameLine();
+        if (ImGui::RadioButton("Local", gizmoMode == ImGuizmo::LOCAL)) gizmoMode = ImGuizmo::LOCAL;
+
+        ImGui::SameLine();
+        ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+        ImGui::SameLine();
+        ImGui::Checkbox("Snap", &useSnap);
+        if (useSnap) {
+            if (gizmoOp == ImGuizmo::TRANSLATE)      { ImGui::SameLine(); ImGui::InputFloat3("ΔT", snapTranslate); }
+            else if (gizmoOp == ImGuizmo::ROTATE)    { ImGui::SameLine(); ImGui::InputFloat ("ΔR (deg)", &snapRotateDeg); }
+            else                                     { ImGui::SameLine(); ImGui::InputFloat3("ΔS", snapScale); }
+        }
+        ImGui::EndChild();
+
+        ImGui::BeginChild("##Viewport",
+                        ImVec2(0, 0),
+                        false,
+                        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+        ImVec2 vAvail = ImGui::GetContentRegionAvail();
+        ImGui::Image((void*)(intptr_t)postProcessFramebuffer.texture, vAvail, ImVec2(0,1), ImVec2(1,0));
+        if (ui.selected) {
+            ImGuizmo::SetOrthographic(false);
+            ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList()); 
+            const ImVec2 vPos   = ImGui::GetWindowPos();
+            const ImVec2 vMin   = ImGui::GetWindowContentRegionMin();
+            const ImVec2 vMax   = ImGui::GetWindowContentRegionMax();
+            const ImVec2 tl     = ImVec2(vPos.x + vMin.x, vPos.y + vMin.y);
+            const float  gW     = vMax.x - vMin.x;
+            const float  gH     = vMax.y - vMin.y;
+            ImGuizmo::SetRect(tl.x, tl.y, gW, gH);
+            glm::mat4 view = camera->GetViewMatrix();
+            glm::mat4 proj = camera->GetProjectionMatrix(gW, gH);
+            glm::mat4 model = ui.selected->getModelMatrix();
+            const float* snapPtr = nullptr;
+            if (useSnap) {
+                if      (gizmoOp == ImGuizmo::TRANSLATE) snapPtr = snapTranslate;
+                else if (gizmoOp == ImGuizmo::ROTATE)    snapPtr = &snapRotateDeg;
+                else                                     snapPtr = snapScale; 
+            }
+
+            ImGuizmo::Manipulate(glm::value_ptr(view),
+                                glm::value_ptr(proj),
+                                gizmoOp,
+                                gizmoMode,
+                                glm::value_ptr(model),
+                                nullptr,
+                                snapPtr);
+
+            if (ImGuizmo::IsUsing()) {
+                const glm::vec3 T(model[3].x, model[3].y, model[3].z);
+                glm::mat3 B(model);
+                glm::vec3 S(glm::length(B[0]), glm::length(B[1]), glm::length(B[2]));
+                const float kEps = 1e-8f;
+                if (S.x < kEps) S.x = kEps;
+                if (S.y < kEps) S.y = kEps;
+                if (S.z < kEps) S.z = kEps;
+                B[0] /= S.x;
+                B[1] /= S.y;
+                B[2] /= S.z;
+
+                if (glm::determinant(B) < 0.0f) {
+                    S.x = -S.x;
+                    B[0] = -B[0];
+                }
+
+                glm::quat R_from_matrix = glm::normalize(glm::quat_cast(B));
+
+                glm::quat R = (gizmoOp == ImGuizmo::SCALE)
+                                ? ui.selected->getRotation()
+                                : R_from_matrix;
+
+                ui.selected->setPosition(T);
+                ui.selected->setRotation(R); 
+                ui.selected->setScale(S);
+            }
+        }
+
+        ImGui::EndChild();
         ImGui::End();
 
         // SHADOW MAP VIEW WINDOW
@@ -512,8 +600,6 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
 
         // --- HIERARCHY WINDOW ---
         ImGui::Begin("Hierarchy");
-
-        // Filter bar (optional)
         ImGui::InputTextWithHint("##filter", "Filter objects...", ui.filter, IM_ARRAYSIZE(ui.filter));
         ImGui::Separator();
 
@@ -531,14 +617,12 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             if (ImGui::Selectable(name.c_str(), isSelected)) {
                 ui.selected      = obj;
                 ui.selectedIndex = i;
-
-                // Refresh the rename buffer for the newly selected object
                 std::snprintf(ui.nameBuf, sizeof(ui.nameBuf), "%s", obj->getName().c_str());
                 ui.nameBufOwner = obj;
-
                 ImGui::SetWindowFocus("Inspector");
             }
 
+            //save for later
             if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {}
         }
 
@@ -553,8 +637,6 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             ImGui::End();
         } else {
             Object* obj = ui.selected;
-
-            // If selection changed externally, re-sync buffer
             if (ui.nameBufOwner != obj) {
                 std::snprintf(ui.nameBuf, sizeof(ui.nameBuf), "%s", obj->getName().c_str());
                 ui.nameBufOwner = obj;
@@ -564,14 +646,10 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             ImGuiInputTextFlags nameFlags =
                 ImGuiInputTextFlags_AutoSelectAll |
                 ImGuiInputTextFlags_EnterReturnsTrue;
-                //ImGuiInputTextFlags_CallbackCompletion; // optional
 
             bool submitted = ImGui::InputText("Name", ui.nameBuf, IM_ARRAYSIZE(ui.nameBuf), nameFlags);
-            // Commit on Enter OR when the widget loses focus after an edit
             if (submitted || (ImGui::IsItemDeactivatedAfterEdit())) {
-                // (Optional) trim whitespace
                 std::string newName = ui.nameBuf;
-                // simple trim:
                 auto l = newName.find_first_not_of(" \t\r\n");
                 auto r = newName.find_last_not_of(" \t\r\n");
                 if (l == std::string::npos) newName.clear();
@@ -579,15 +657,11 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
 
                 if (!newName.empty() && newName != obj->getName()) {
                     obj->setName(newName);
-
-                    // If you show names in the Hierarchy, they’ll reflect next frame automatically.
-                    // If you also keep maps keyed by name, update them here.
                 }
             }
 
             ImGui::Separator();
 
-            // …the rest of your inspector (position/rotation/scale)…
             glm::vec3 pos = obj->getPosition();
             if (ImGui::DragFloat3("Position", &pos.x, 0.05f)) obj->setPosition(pos);
 
@@ -595,11 +669,10 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             if (ImGui::DragFloat3("Rotation (deg)", &eulerDeg.x, 0.5f))
                 obj->setRotation(eulerDegreesToQuat(eulerDeg));
 
-            static float scaleScalar = 1.0f;
-            if (ImGui::DragFloat("Uniform Scale", &scaleScalar, 0.01f, 0.01f, 100.0f))
-                obj->setScale(glm::vec3(scaleScalar));
+            glm::vec3 scale = obj->getScale();
+            if (ImGui::DragFloat3("Scale", &scale.x, 0.01f))
+                obj->setScale(scale);
 
-            // (optional) quick actions
             if (ImGui::Button("Center on Origin")) {
                 obj->setPosition(glm::vec3(0.0f));
             }
@@ -610,7 +683,6 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             ImGui::SameLine();
             if (ImGui::Button("Reset Scale")) {
                 obj->setScale(glm::vec3(1.0f));
-                scaleScalar = 1.0f;
             }
 
             ImGui::End();
