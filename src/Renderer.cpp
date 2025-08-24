@@ -494,7 +494,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         const float toolbarH = ImGui::GetFrameHeightWithSpacing();
         ImGui::BeginChild("##Toolbar", ImVec2(0, toolbarH), false, ImGuiWindowFlags_NoScrollbar);
 
-        ImGui::TextUnformatted("Gizmo:");
+        ImGui::TextUnformatted("Transform:");
         ImGui::SameLine();
         if (ImGui::RadioButton("Translate", gizmoOp == ImGuizmo::TRANSLATE)) gizmoOp = ImGuizmo::TRANSLATE;
         ImGui::SameLine();
