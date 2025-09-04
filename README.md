@@ -1,8 +1,7 @@
-<img width="3834" height="2094" alt="image" src="https://github.com/user-attachments/assets/553cdc51-b6fd-4718-be74-76ed04a1c071" />
-
+<img width="2879" height="1831" alt="image" src="https://github.com/user-attachments/assets/0209dab2-56d8-429e-99cd-85c10298b6c2" />
 
 This is my personal engine that I am developing from the ground up in C++/OpenGL.
-Used for general rendering and learning graphics programming.
+Used for general rendering and graphics programming.
 
 Features:
   
@@ -16,7 +15,7 @@ Features:
 
 -Lightweight Entity Component System
 
--Inspector controlled transforms
+-Inspector controlled transforms, widgets
 
 -Instanced Rendering
 
@@ -27,3 +26,5 @@ Features:
 -reflection cubemaps
 
 -Transparency
+
+-Normal vector visualization
