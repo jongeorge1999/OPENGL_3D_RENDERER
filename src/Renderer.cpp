@@ -134,6 +134,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     glBindBuffer(GL_UNIFORM_BUFFER, 0);
     glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboMatrices, 0, 2 * sizeof(glm::mat4));
 
+    //screen resizing variables
     ImVec2 lastSceneSize = ImVec2(SCR_WIDTH, SCR_HEIGHT);
     int fbWidth = (int)lastSceneSize.x;
     int fbHeight = (int)lastSceneSize.y;
