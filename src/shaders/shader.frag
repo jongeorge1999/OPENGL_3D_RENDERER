@@ -54,7 +54,9 @@ uniform vec3 viewPos;
 
 uniform float far_plane;
 
-#define NR_POINT_LIGHTS 4
+#define MAX_POINT_LIGHTS 2
+//#define NR_POINT_LIGHTS 4
+uniform int NR_POINT_LIGHTS;
 
 uniform int TEST;
 
@@ -68,12 +70,12 @@ in vec3 TangentFragPos;
 in mat3 TBN;
 
 uniform DirLight dirLight;
-uniform PointLight pointLights[NR_POINT_LIGHTS];
+uniform PointLight pointLights[MAX_POINT_LIGHTS];
 uniform SpotLight spotLight;
 uniform Material material;
 
-uniform vec3 pointLightPos[NR_POINT_LIGHTS];
-uniform samplerCube depthCubeMap[NR_POINT_LIGHTS];
+uniform vec3 pointLightPos[MAX_POINT_LIGHTS];
+uniform samplerCube depthCubeMap[MAX_POINT_LIGHTS];
 
 uniform bool useDiffuse;
 uniform bool useAmbient;
@@ -148,43 +150,34 @@ void main() {
 
     // directional lighting
     if(useDirectionalLight) {
-        if(useNormalMaps) {
-            result = CalcDirLight(dirLight, normalMap, viewDirNormal) * directionalLightIntensity;
-        } else { 
-            result = CalcDirLight(dirLight, norm, viewDir) * directionalLightIntensity;
-        }
+        if(useNormalMaps) { result = CalcDirLight(dirLight, normalMap, viewDirNormal) * directionalLightIntensity; } 
+        else { result = CalcDirLight(dirLight, norm, viewDir) * directionalLightIntensity; }
     }
+    
     // point lights
     if(usePointLight) {
-        for(int i = 0; i < NR_POINT_LIGHTS; i++)
+        int n = min(NR_POINT_LIGHTS, MAX_POINT_LIGHTS);
+        for(int i = 0; i < n; i++) { 
             if(useNormalMaps) {
                 //result += CalcPointLight(pointLights[i], normalMap, FragPos, viewDirNormal, i) * pointLightIntensity; 
                 result += CalcPointLight(pointLights[i], norm, FragPos, viewDir, i) * pointLightIntensity; 
             } else {
                 result += CalcPointLight(pointLights[i], norm, FragPos, viewDir, i) * pointLightIntensity; 
             }
+        }
     }   
     // spot light
-    if(useFlashlight) {
-        result += CalcSpotLight(spotLight, norm, FragPos, viewDir) * flashlightIntensity;
-    }
+    if(useFlashlight) { result += CalcSpotLight(spotLight, norm, FragPos, viewDir) * flashlightIntensity; }
     
     if (!showDepthBuffer) {
-        //FragColor = vec4(result, 1.0);
-        //float shadow = ShadowCalculation(fs_in.FragPosLightSpace);                      
-       // vec3 lighting = (ambient + (1.0 - shadow) * (diffuse + specular)) * color;
         FragColor = vec4(result * mapped, 1.0);
-        //vec3 worldNormal = normalize(TBN * normalMap);
-        //vec3 visualNormal = worldNormal * 0.5 + 0.5; // Map to [0,1]
-        //FragColor = vec4(normalMap,1.0);
     } else {
         float depth = LinearizeDepth(gl_FragCoord.z) / far;
         FragColor = vec4(vec3(depth), 1.0);
     }
 }
 
-float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal)
-{
+float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal) {
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
     projCoords = projCoords * 0.5 + 0.5;
     float closestDepth = texture(shadowMap, projCoords.xy).r; 
@@ -195,17 +188,14 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal)
     float bias = max(0.0005 * (1.0 - dot(normal, lightDir)), dirShadowBias);
     float shadow = 0.0;
     vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
-    for(int x = -1; x <= 1; ++x)
-    {
-        for(int y = -1; y <= 1; ++y)
-        {
+    for(int x = -1; x <= 1; ++x) {
+        for(int y = -1; y <= 1; ++y) {
             float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r; 
             shadow += currentDepth - bias > pcfDepth  ? 1.0 : 0.0;        
         }    
     }
     shadow /= 9.0;
-    if(projCoords.z > 1.0)
-        shadow = 0.0;  
+    if(projCoords.z > 1.0) { shadow = 0.0; }
     return shadow;
 }
 
@@ -222,8 +212,7 @@ float PointShadowCalculation(vec3 fragPos, int index, vec3 normal)
         //float viewDistance = length(TBN * viewPos - TBN * fragPos);
         float viewDistance = length(viewPos - fragPos);
         float diskRadius = (1.0 + (viewDistance / far_plane)) / pointLightRadius;
-        for(int i = 0; i < samples; ++i)
-        {
+        for(int i = 0; i < samples; ++i) {
             float closestDepth = texture(depthCubeMap[index], fragToLight + gridSamplingDisk[i] * diskRadius).r;
             closestDepth *= far_plane;
             if(currentDepth - bias > closestDepth)
@@ -245,7 +234,6 @@ float PointShadowCalculation(vec3 fragPos, int index, vec3 normal)
         float bias = max(shadowBias * (1.0 - dot(normal, lightDir)), shadowBias);
         shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
     }
-
     return shadow;
 }
 

@@ -7,6 +7,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/quaternion.hpp>
+#include <random>
 
 class Shader;
 
@@ -22,6 +23,8 @@ private:
     std::vector<Object*>* objects;
     Model model;
     Shader* shaderStored;
+    bool isLight;
+    glm::vec3 lightColor;
 
     // Recalculate the model matrix whenever transformations change
     void updateModelMatrix() {
@@ -32,7 +35,7 @@ private:
     }
 
 public:
-    Object(Shader* shaderIn = nullptr, const std::string& modelPath = "", std::vector<Object*> *vec = nullptr, const std::string& objName = "", glm::vec3 objPos = glm::vec3(0.0f), glm::vec3 objScale = glm::vec3(1.0f), glm::quat objRot = glm::quat(1.0f, 0.0f, 0.0f, 0.0f))
+    Object(Shader* shaderIn = nullptr, const std::string& modelPath = "", std::vector<Object*> *vec = nullptr, const std::string& objName = "", glm::vec3 objPos = glm::vec3(0.0f), glm::vec3 objScale = glm::vec3(1.0f), glm::quat objRot = glm::quat(1.0f, 0.0f, 0.0f, 0.0f), bool is_light = false)
         : 
           objects(vec),
           position(objPos), 
@@ -40,14 +43,37 @@ public:
           scale(objScale), modelMatrix(glm::mat4(1.0f)), 
           name(objName),
           model(modelPath),
-          shaderStored(shaderIn)
+          shaderStored(shaderIn),
+          isLight(is_light)
           { 
             updateModelMatrix();
+            if (is_light) {
+                static std::mt19937 rng{ std::random_device{}() };
+                float r = std::uniform_real_distribution<float>(0.0f, 1.0f)(rng);
+                float g = std::uniform_real_distribution<float>(0.0f, 1.0f)(rng);
+                float b = std::uniform_real_distribution<float>(0.0f, 1.0f)(rng);
+                lightColor = glm::vec3(r,g,b);
+            }
             vec->push_back(this);
         }
 
+    glm::vec3& getLightColor() {
+        return lightColor;
+    }
+
+    void setLightColor(glm::vec3 newColor) {
+        lightColor = newColor;
+    }
+
     glm::vec3& getPosition() { 
         return position;
+    }
+
+    bool is_light() {
+        if (isLight) {
+            return true;
+        }
+        return false;
     }
 
     void Draw(Shader shader) {

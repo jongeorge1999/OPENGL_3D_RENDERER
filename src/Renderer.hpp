@@ -13,6 +13,7 @@
 #include "TexLoader.hpp"
 #include "SceneReader.hpp"
 #include "PrimitiveHelper.hpp"
+#include <imGui/imgui.h>
 
 class Renderer {
     private:
@@ -23,15 +24,16 @@ class Renderer {
         //screen width and height
         const unsigned int SCR_WIDTH = 2400;
         const unsigned int SCR_HEIGHT = 1800;
-        const unsigned int SHADOW_WIDTH = 4096;
-        const unsigned int SHADOW_HEIGHT = 4096;
-        const unsigned int POINT_SHADOW_WIDTH = 4096;
-        const unsigned int POINT_SHADOW_HEIGHT = 4096;
+        const unsigned int SHADOW_WIDTH = 1024;
+        const unsigned int SHADOW_HEIGHT = 1024;
+        const unsigned int POINT_SHADOW_WIDTH = 1024;
+        const unsigned int POINT_SHADOW_HEIGHT = 1024;
 
-        const int NUM_POINT_LIGHTS = 4;
+        int NUM_POINT_LIGHTS = 0;
 
         //Game object manager
         std::vector<Object*> objects;
+        std::vector<Object*> lights;
 
         //Texture loader
         TexLoader tl;
@@ -65,6 +67,10 @@ class Renderer {
         bool sharpen = false;
         bool blur = false;
         bool edgeDetection = false;
+        bool  animateDirLight = true; 
+        float orbitSpeed      = 0.25f;
+        float orbitRadius     = 32.0f;
+        glm::vec2 orbitCenter = {-16.0f, 16.0f};
         float spinSpeed = 0.0f;
         float flashlightIntensity = 1.0f;
         float directionLightIntensity = 0.1f;
@@ -74,7 +80,7 @@ class Renderer {
         bool gammaCorrection = true;
         bool useShadows = true;
         bool showDepthMap = false;
-        int shadowItem = 24;
+        int shadowItem = 4;
         bool useMSAA = true;
         bool useNormalMaps = true;
         float shadowFactor = 0.4;
@@ -91,6 +97,10 @@ class Renderer {
             unsigned int texture;       // Texture attachment
             unsigned int renderbuffer;  // Renderbuffer attachment
         };
+
+        glm::mat4 firstPass(Shader depthShader, Framebuffer framebuffer, Framebuffer depthMapBuffer, Framebuffer* pointLightsBuffer, Shader pointDepthShader, int fbWidth, int fbHeight);
+        ImGuiIO& initImGui(GLFWwindow* window);
+        void renderIMGUI(Framebuffer postProcessFramebuffer, Camera* camera, ImGuiIO& io, GLFWwindow* window);
         
         unsigned int CopyTexture(GLuint srcTexture, GLenum target, int width, int height)
         {
@@ -329,6 +339,4 @@ class Renderer {
             "../textures/space_skybox2/space2_front.png",
             "../textures/space_skybox2/space2_back.png"
         };
-
-
 };

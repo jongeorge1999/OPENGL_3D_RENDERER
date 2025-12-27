@@ -29,14 +29,17 @@
 #include "Renderer.hpp"
 #include "Shader.hpp"
 
-void renderQuad();
-
 static ImGuizmo::OPERATION gizmoOp  = ImGuizmo::TRANSLATE;
 static ImGuizmo::MODE      gizmoMode= ImGuizmo::WORLD;
 static bool useSnap = false;
 static float snapTranslate[3] = {0.5f, 0.5f, 0.5f};
 static float snapRotateDeg    = 15.0f;
 static float snapScale[3]     = {0.1f, 0.1f, 0.1f};
+
+static unsigned int cubemapTextureDay; 
+static unsigned int cubemapTextureNight;
+static unsigned int cubemapTextureSpace1;
+static unsigned int cubemapTextureSpace2;
 
 //UI State Machine
 struct UIState {
@@ -74,11 +77,22 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     Object reflectiveST(&reflectiveShader, "../models/stormtrooper/stormtrooper.obj", &objects, "Reflective ST", glm::vec3(2.0f, 0.0f, 2.0f));
     Object parallaxWall(&parallaxShader, "../models/parallax_wall/parallax.obj", &objects, "Parallax Wall", glm::vec3(-14.5f, 0.5f, -3.5f), glm::vec3(0.1f));
     Object parallaxToy(&parallaxShader, "../models/parallax_toy/parallax.obj", &objects, "Parallax Toy", glm::vec3(-0.5f, 0.5f, -3.5f), glm::vec3(0.1f));
-    Object wallLeft(&objectShader, "../models/wood_floor/wood_floor.obj", &objects, "WallLeft", glm::vec3(14.0f, 1.0f, -0.3f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)));
-    Object wallRight(&objectShader, "../models/wood_floor/wood_floor.obj", &objects, "WallRight", glm::vec3(18.0f, 1.0f, -0.3f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)));
-    Object wallTop(&objectShader, "../models/wood_floor/wood_floor.obj", &objects, "WallTop", glm::vec3(16.0f, 3.0f, -0.3f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 0.0f)));
-    Object wallBack(&objectShader, "../models/wood_floor/wood_floor.obj", &objects, "WallBack", glm::vec3(16.0f, 3.0f, -17.0f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(90.0f, 0.0f, 0.0f)));
-    Object wallTest(&objectShader, "../models/wood_floor/wood_floor.obj", &objects, "WallTest", glm::vec3(0.0f, 1.0f, -15.0f), glm::vec3(0.25f, 0.25f, 0.25f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)));
+    Object wallLeft(&objectShader, "../models/wood_floor/wood_floor.obj", &objects, "WallLeft", glm::vec3(14.0f, 1.0f, -0.3f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)), false);
+    Object wallRight(&objectShader, "../models/wood_floor/wood_floor.obj", &objects, "WallRight", glm::vec3(18.0f, 1.0f, -0.3f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)), false);
+    Object wallTop(&objectShader, "../models/wood_floor/wood_floor.obj", &objects, "WallTop", glm::vec3(16.0f, 3.0f, -0.3f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 0.0f)), false);
+    Object wallBack(&objectShader, "../models/wood_floor/wood_floor.obj", &objects, "WallBack", glm::vec3(16.0f, 3.0f, -17.0f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(90.0f, 0.0f, 0.0f)), false);
+    Object wallTest(&objectShader, "../models/wood_floor/wood_floor.obj", &objects, "WallTest", glm::vec3(0.0f, 1.0f, -15.0f), glm::vec3(0.25f, 0.25f, 0.25f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)), false);
+    Object light1(&objectShader, "../models/box/cube.obj", &objects, "Light 1", glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.2f, 0.2f, 0.2f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)), true);
+    Object light2(&objectShader, "../models/box/cube.obj", &objects, "Light 2", glm::vec3(0.5f, 0.0f, 0.0f), glm::vec3(0.2f, 0.2f, 0.2f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)), true);
+
+    for (Object* obj: objects) {
+        if (obj->is_light()) {
+            NUM_POINT_LIGHTS++;
+            lights.push_back(obj);
+        }
+    }
+    objectShader.use();
+    objectShader.setInt("NR_POINT_LIGHTS", NUM_POINT_LIGHTS); 
 
     // openGL settings
     glEnable(GL_DEPTH_TEST);
@@ -90,6 +104,10 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     glFrontFace(GL_CCW); 
 
     //load textures
+    cubemapTextureDay = tl.loadCubemap(faces_day);
+    cubemapTextureNight = tl.loadCubemap(faces_night);
+    cubemapTextureSpace1 = tl.loadCubemap(faces_space1);
+    cubemapTextureSpace2 = tl.loadCubemap(faces_space2);
     unsigned int transparentTexture = tl.loadTexture("../textures/red_window.png");
     unsigned int grassTexture = tl.loadTexture("../textures/grass.png");
     unsigned int brickTexture = tl.loadTexture("../textures/brick.jpg");
@@ -97,10 +115,6 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     unsigned int brickwallNormalTexture = tl.loadTexture("../textures/brickwall_normal.jpg");
 
     //load skyboxes
-    unsigned int cubemapTextureDay = tl.loadCubemap(faces_day);
-    unsigned int cubemapTextureNight = tl.loadCubemap(faces_night);
-    unsigned int cubemapTextureSpace1 = tl.loadCubemap(faces_space1);
-    unsigned int cubemapTextureSpace2 = tl.loadCubemap(faces_space2);
     currSkybox = cubemapTextureSpace2;
 
     // VAOs and VBOs
@@ -146,26 +160,14 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     Framebuffer postProcessFramebuffer = createFramebuffer(fbWidth, fbHeight);
 
 
-    Framebuffer pointLightsBuffers[NUM_POINT_LIGHTS];
-    // depth cube map
-    for (int i = 0; i < NUM_POINT_LIGHTS; i++) { Framebuffer pointBuffer = createDepthCubemapBuffer(); pointLightsBuffers[i] = pointBuffer; }
+    constexpr int MAX_POINT_LIGHTS = 8;
+    std::array<Framebuffer, MAX_POINT_LIGHTS> pointLightsBuffers{};
+    for (int i = 0; i < MAX_POINT_LIGHTS; i++) {
+        pointLightsBuffers[i] = createDepthCubemapBuffer();
+    }
 
     // Initialize ImGui
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
-    ImGui::StyleColorsDark();
-    ImGui_ImplGlfw_InitForOpenGL(window, true);
-    ImGui_ImplOpenGL3_Init("#version 130");
-    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;;
-    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
-    ImGuiStyle& style = ImGui::GetStyle();
-    style.WindowPadding = ImVec2(0.0f, 0.0f);       
-    style.WindowBorderSize = 0.0f;                
-    style.FramePadding = ImVec2(4.0f, 4.0f); 
-    style.ItemSpacing = ImVec2(4.0f, 4.0f);     
-    style.TabBorderSize = 0.0f;   
-    style.WindowRounding = 0.0f;  
+    ImGuiIO& io = initImGui(window);
 
     // perspective (only needs to be set once unless you want to change projection)
     glm::mat4 projection = glm::perspective(glm::radians(camera->Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
@@ -236,11 +238,6 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         }
 
         // dirLight Anim
-        static bool  animateDirLight = true; 
-        static float orbitSpeed      = 0.25f;
-        static float orbitRadius     = 32.0f;
-        static glm::vec2 orbitCenter = {-16.0f, 16.0f};
-
         if (animateDirLight) {
             float t = glfwGetTime() * orbitSpeed;
             float y = lightPos.y;              
@@ -249,59 +246,11 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             lightPos.y = y;
         }
 
-        //variables for shadowing
-        glm::mat4 lightProjection, lightView, lightSpaceMatrix;
-        float near_plane = 0.1f, far_plane = 100.0f;
-        lightProjection = glm::ortho(-20.0f, 20.0f, -20.0f, 20.0f, near_plane, far_plane);
-        lightView = glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-        lightSpaceMatrix = lightProjection * lightView;
-
         // render scene from light's point of view (first pass)
-        glCullFace(GL_FRONT);
-        depthShader.use();
-        depthShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
-        glBindFramebuffer(GL_FRAMEBUFFER, depthMapBuffer.ID);
-        glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
-        glClear(GL_DEPTH_BUFFER_BIT);
-        for (Object* obj : objects) {obj->Draw(depthShader);}
-        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.ID);
-        glViewport(0, 0, fbWidth, fbHeight);
+        // MARK: first pass
+        glm::mat4 lightSpaceMatrix = firstPass(depthShader, framebuffer, depthMapBuffer, pointLightsBuffers.data(), pointDepthShader, fbWidth, fbHeight);
 
-        // clear the buffers
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-
-        // create depth cubemap transformation matrices
-        float point_near_plane = 0.1f;
-        float point_far_plane = 25.0f;
-
-        // render scene to depth cubemap for each point light
-        for (int i = 0; i < NUM_POINT_LIGHTS; i++) {
-            glm::mat4 shadowProj = glm::perspective(glm::radians(90.0f), (float)POINT_SHADOW_WIDTH / (float)POINT_SHADOW_HEIGHT, point_near_plane, point_far_plane);
-            std::vector<glm::mat4> shadowTransforms;
-            shadowTransforms.push_back(shadowProj * glm::lookAt(sr.pointLightPositions[i], sr.pointLightPositions[i] + glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)));
-            shadowTransforms.push_back(shadowProj * glm::lookAt(sr.pointLightPositions[i], sr.pointLightPositions[i] + glm::vec3(-1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)));
-            shadowTransforms.push_back(shadowProj * glm::lookAt(sr.pointLightPositions[i], sr.pointLightPositions[i] + glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)));
-            shadowTransforms.push_back(shadowProj * glm::lookAt(sr.pointLightPositions[i], sr.pointLightPositions[i] + glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f)));
-            shadowTransforms.push_back(shadowProj * glm::lookAt(sr.pointLightPositions[i], sr.pointLightPositions[i] + glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, -1.0f, 0.0f)));
-            shadowTransforms.push_back(shadowProj * glm::lookAt(sr.pointLightPositions[i], sr.pointLightPositions[i] + glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, -1.0f, 0.0f)));
-            glViewport(0, 0, POINT_SHADOW_WIDTH, POINT_SHADOW_HEIGHT);
-            glBindFramebuffer(GL_FRAMEBUFFER, pointLightsBuffers[i].ID);
-            glClear(GL_DEPTH_BUFFER_BIT);
-            pointDepthShader.use();
-            for (unsigned int i = 0; i < 6; ++i) { pointDepthShader.setMat4("shadowMatrices[" + std::to_string(i) + "]", shadowTransforms[i]); }
-            pointDepthShader.setFloat("far_plane", point_far_plane);
-            pointDepthShader.setVec3("lightPos", sr.pointLightPositions[i]);
-            for (Object* obj : objects) {obj->Draw(pointDepthShader);}
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
-            glViewport(0, 0, fbWidth, fbHeight);
-            glActiveTexture(GL_TEXTURE25 + i);
-            glBindTexture(GL_TEXTURE_CUBE_MAP, pointLightsBuffers[i].texture);
-        }
-
-        //setting shadow texture
-        glActiveTexture(GL_TEXTURE24);
-        glBindTexture(GL_TEXTURE_2D, depthMapBuffer.texture);
-
+        
         // draw to non-default framebuffer
         // Only bind and clear the framebuffer if we're actually rendering to it
         if (renderToTexture) {
@@ -316,12 +265,16 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         // MARK: UNIFORM HELL
         objectShader.use();
         sr.setParams(objectShader, *camera);
+        sr.updatePointLights(objectShader, lights);
         objectShader.setVec3("lightPos", lightPos);
-        objectShader.setFloat("far_plane", point_far_plane);
+        objectShader.setFloat("far_plane", 25.0f);
         objectShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
         objectShader.setInt("shadowMap", shadowItem);
-        for (int i = 0; i < NUM_POINT_LIGHTS; i++) { objectShader.setVec3("pointLightPos[" + std::to_string(i) + "]", sr.pointLightPositions[i]); }
-        for (int i = 0; i < NUM_POINT_LIGHTS; i++) { objectShader.setInt("depthCubeMap[" + std::to_string(i) + "]", 25 + i); }
+        constexpr int MAX_POINT_LIGHTS = 8;   
+        int n = std::min(NUM_POINT_LIGHTS, MAX_POINT_LIGHTS);
+        objectShader.setInt("NR_POINT_LIGHTS", n);
+        for (int i = 0; i < n; i++) { objectShader.setVec3("pointLightPos[" + std::to_string(i) + "]", lights[i]->getPosition()); }
+        for (int i = 0; i < n; i++) { objectShader.setInt("depthCubeMap[" + std::to_string(i) + "]", 5 + i); }
         
         // imgui uniforms
         objectShader.setBool("useAmbient", useAmbient);
@@ -354,33 +307,33 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         for (Object* obj : objects) {obj->Draw();}
 
         // Pointlight cubes
-        pointlightcube.use();
-        glDisable(GL_CULL_FACE);
-        glBindVertexArray(lightVAO);
-        vector<glm::vec3> pointLights = sr.getpointLights();
-        for (unsigned int i = 0; i < NUM_POINT_LIGHTS; i++) {
-            glm::vec3 val;
-            glGetUniformfv(objectShader.ID, glGetUniformLocation(objectShader.ID, std::format("pointLights[{}].diffuse", i).c_str()), glm::value_ptr(val));
-            pointlightcube.setVec3("color", val);
-            model = glm::mat4(1.0f);
-            model = glm::translate(model, pointLights[i]);
-            model = glm::scale(model, glm::vec3(0.2f));
-            pointlightcube.setMat4("model", model);
-            glDrawArrays(GL_TRIANGLES, 0, 36);
-        }
+        // pointlightcube.use();
+        // glDisable(GL_CULL_FACE);
+        // glBindVertexArray(lightVAO);
+        // vector<glm::vec3> pointLights = sr.getpointLights();
+        // for (unsigned int i = 0; i < NUM_POINT_LIGHTS; i++) {
+        //     glm::vec3 val;
+        //     glGetUniformfv(objectShader.ID, glGetUniformLocation(objectShader.ID, std::format("pointLights[{}].diffuse", i).c_str()), glm::value_ptr(val));
+        //     pointlightcube.setVec3("color", val);
+        //     model = glm::mat4(1.0f);
+        //     model = glm::translate(model, pointLights[i]);
+        //     model = glm::scale(model, glm::vec3(0.2f));
+        //     pointlightcube.setMat4("model", model);
+        //     glDrawArrays(GL_TRIANGLES, 0, 36);
+        // }
 
         // Grass
-        grassShader.use();
-        glBindVertexArray(grassVAO);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, grassTexture);
-        vector<glm::vec3> vegetation = sr.getVegetation();
-        for (unsigned int i = 0; i < vegetation.size(); i++) {
-            model = glm::mat4(1.0f);
-            model = glm::translate(model, vegetation[i]);
-            grassShader.setMat4("model", model);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-        }
+        // grassShader.use();
+        // glBindVertexArray(grassVAO);
+        // glActiveTexture(GL_TEXTURE0);
+        // glBindTexture(GL_TEXTURE_2D, grassTexture);
+        // vector<glm::vec3> vegetation = sr.getVegetation();
+        // for (unsigned int i = 0; i < vegetation.size(); i++) {
+        //     model = glm::mat4(1.0f);
+        //     model = glm::translate(model, vegetation[i]);
+        //     grassShader.setMat4("model", model);
+        //     glDrawArrays(GL_TRIANGLES, 0, 6);
+        // }
 
         // draw skybox (LAST BUT BEFORE TRANSPARENT)
         glDepthFunc(GL_LEQUAL);
@@ -395,16 +348,16 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         glDepthFunc(GL_LESS);
 
         // Windows
-        transparentShader.use();
-        glBindVertexArray(transparentVAO);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, transparentTexture);
-        for (std::map<float, glm::vec3>::reverse_iterator it = sorted.rbegin(); it != sorted.rend(); ++it) {
-            model = glm::mat4(1.0f);
-            model = glm::translate(model, it->second);
-            transparentShader.setMat4("model", model);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-        }
+        // transparentShader.use();
+        // glBindVertexArray(transparentVAO);
+        // glActiveTexture(GL_TEXTURE0);
+        // glBindTexture(GL_TEXTURE_2D, transparentTexture);
+        // for (std::map<float, glm::vec3>::reverse_iterator it = sorted.rbegin(); it != sorted.rend(); ++it) {
+        //     model = glm::mat4(1.0f);
+        //     model = glm::translate(model, it->second);
+        //     transparentShader.setMat4("model", model);
+        //     glDrawArrays(GL_TRIANGLES, 0, 6);
+        // }
 
         //blit multisampled buffer(s) to normal colorbuffer of intermediate FBO. Image is stored in screenTexture
         if(renderToTexture && useMSAA) {
@@ -445,361 +398,12 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         }
 
         // MARK: imgui
-        // Set up fullscreen host window for DockSpace
-        ImGuiWindowFlags dockspace_window_flags = 0;
-        const ImGuiViewport* viewport = ImGui::GetMainViewport();
-        ImGui::SetNextWindowPos(viewport->Pos);
-        ImGui::SetNextWindowSize(viewport->Size);
-        ImGui::SetNextWindowViewport(viewport->ID);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-
-        dockspace_window_flags |= ImGuiWindowFlags_NoTitleBar 
-                                | ImGuiWindowFlags_NoCollapse 
-                                | ImGuiWindowFlags_NoResize 
-                                | ImGuiWindowFlags_NoMove 
-                                | ImGuiWindowFlags_NoBringToFrontOnFocus 
-                                | ImGuiWindowFlags_NoNavFocus;
-
-
-        //DOCKSPACE
-        ImGui::Begin("DockSpaceRoot", nullptr, dockspace_window_flags);
-        ImGui::PopStyleVar(3);
-        ImGuiID dockspace_id = ImGui::GetID("GeorgeDockspace");
-        ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_None;
-        ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
-        static bool first_time = true;
-        if (first_time) {
-            ImGui::DockBuilderRemoveNode(dockspace_id);
-            ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
-            ImGui::DockBuilderSetNodeSize(dockspace_id, viewport->Size);
-
-            ImGuiID dock_main_id = dockspace_id;
-            ImGuiID dock_right = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Right, 0.3f, nullptr, &dock_main_id);
-            ImGuiID dock_bottom = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Down, 0.3f, nullptr, &dock_main_id);
-            ImGuiID dock_left = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Left, 0.3f, nullptr, &dock_main_id);
-            ImGuiID dock_right_inspector = ImGui::DockBuilderSplitNode(dock_right, ImGuiDir_Right, 0.50f, nullptr, &dock_right);
-
-            ImGui::DockBuilderDockWindow("Scene", dock_main_id);
-            ImGui::DockBuilderDockWindow("George Engine Debug Menu", dock_bottom);
-            ImGui::DockBuilderDockWindow("Hierarchy", dock_left);
-            ImGui::DockBuilderDockWindow("Inspector", dock_right_inspector);
-
-            ImGui::DockBuilderFinish(dockspace_id);
-            first_time = false;
-        }
-        ImGui::End();
-
-        ImGui::Begin("Scene", nullptr, ImGuiWindowFlags_None);
-        const float toolbarH = ImGui::GetFrameHeightWithSpacing();
-        ImGui::BeginChild("##Toolbar", ImVec2(0, toolbarH), false, ImGuiWindowFlags_NoScrollbar);
-
-        ImGui::TextUnformatted("Transform:");
-        ImGui::SameLine();
-        if (ImGui::RadioButton("Translate", gizmoOp == ImGuizmo::TRANSLATE)) gizmoOp = ImGuizmo::TRANSLATE;
-        ImGui::SameLine();
-        if (ImGui::RadioButton("Rotate", gizmoOp == ImGuizmo::ROTATE)) gizmoOp = ImGuizmo::ROTATE;
-        ImGui::SameLine();
-        if (ImGui::RadioButton("Scale", gizmoOp == ImGuizmo::SCALE)) gizmoOp = ImGuizmo::SCALE;
-
-        ImGui::SameLine();
-        ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
-        ImGui::SameLine();
-        if (ImGui::RadioButton("World", gizmoMode == ImGuizmo::WORLD)) gizmoMode = ImGuizmo::WORLD;
-        ImGui::SameLine();
-        if (ImGui::RadioButton("Local", gizmoMode == ImGuizmo::LOCAL)) gizmoMode = ImGuizmo::LOCAL;
-
-        ImGui::SameLine();
-        ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
-        ImGui::SameLine();
-        ImGui::Checkbox("Snap", &useSnap);
-        if (useSnap) {
-            if (gizmoOp == ImGuizmo::TRANSLATE)      { ImGui::SameLine(); ImGui::InputFloat3("ΔT", snapTranslate); }
-            else if (gizmoOp == ImGuizmo::ROTATE)    { ImGui::SameLine(); ImGui::InputFloat ("ΔR (deg)", &snapRotateDeg); }
-            else                                     { ImGui::SameLine(); ImGui::InputFloat3("ΔS", snapScale); }
-        }
-        ImGui::EndChild();
-
-        ImGui::BeginChild("##Viewport",
-                        ImVec2(0, 0),
-                        false,
-                        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-        ImVec2 vAvail = ImGui::GetContentRegionAvail();
-        ImGui::Image((void*)(intptr_t)postProcessFramebuffer.texture, vAvail, ImVec2(0,1), ImVec2(1,0));
-        if (ui.selected) {
-            ImGuizmo::SetOrthographic(false);
-            ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList()); 
-            const ImVec2 vPos   = ImGui::GetWindowPos();
-            const ImVec2 vMin   = ImGui::GetWindowContentRegionMin();
-            const ImVec2 vMax   = ImGui::GetWindowContentRegionMax();
-            const ImVec2 tl     = ImVec2(vPos.x + vMin.x, vPos.y + vMin.y);
-            const float  gW     = vMax.x - vMin.x;
-            const float  gH     = vMax.y - vMin.y;
-            ImGuizmo::SetRect(tl.x, tl.y, gW, gH);
-            glm::mat4 view = camera->GetViewMatrix();
-            glm::mat4 proj = camera->GetProjectionMatrix(gW, gH);
-            glm::mat4 model = ui.selected->getModelMatrix();
-            const float* snapPtr = nullptr;
-            if (useSnap) {
-                if      (gizmoOp == ImGuizmo::TRANSLATE) snapPtr = snapTranslate;
-                else if (gizmoOp == ImGuizmo::ROTATE)    snapPtr = &snapRotateDeg;
-                else                                     snapPtr = snapScale; 
-            }
-
-            ImGuizmo::Manipulate(glm::value_ptr(view),
-                                glm::value_ptr(proj),
-                                gizmoOp,
-                                gizmoMode,
-                                glm::value_ptr(model),
-                                nullptr,
-                                snapPtr);
-
-            if (ImGuizmo::IsUsing()) {
-                const glm::vec3 T(model[3].x, model[3].y, model[3].z);
-                glm::mat3 B(model);
-                glm::vec3 S(glm::length(B[0]), glm::length(B[1]), glm::length(B[2]));
-                const float kEps = 1e-8f;
-                if (S.x < kEps) S.x = kEps;
-                if (S.y < kEps) S.y = kEps;
-                if (S.z < kEps) S.z = kEps;
-                B[0] /= S.x;
-                B[1] /= S.y;
-                B[2] /= S.z;
-
-                if (glm::determinant(B) < 0.0f) {
-                    S.x = -S.x;
-                    B[0] = -B[0];
-                }
-
-                glm::quat R_from_matrix = glm::normalize(glm::quat_cast(B));
-
-                glm::quat R = (gizmoOp == ImGuizmo::SCALE)
-                                ? ui.selected->getRotation()
-                                : R_from_matrix;
-
-                ui.selected->setPosition(T);
-                ui.selected->setRotation(R); 
-                ui.selected->setScale(S);
-            }
-        }
-
-        ImGui::EndChild();
-        ImGui::End();
-
-        // SHADOW MAP VIEW WINDOW
-        // ImGui::Begin("Shadow Map");
-        // ImVec2 shadowSize = ImGui::GetContentRegionAvail();
-        // ImGui::Image((void*)(intptr_t)depthMapBuffer.texture, shadowSize, ImVec2(0, 1), ImVec2(1, 0),
-        //      ImVec4(1,1,1,1), ImVec4(0,0,0,0));
-        // ImGui::End();
-
-        //inspector view window
-        // ImGui::Begin("Inspector");
-        // if (ImGui::Button("Close Application")) { glfwSetWindowShouldClose(window, true); }
-        // ImGui::End();
-
-        // --- HIERARCHY WINDOW ---
-        ImGui::Begin("Hierarchy");
-        ImGui::InputTextWithHint("##filter", "Filter objects...", ui.filter, IM_ARRAYSIZE(ui.filter));
-        ImGui::Separator();
-
-        for (int i = 0; i < (int)objects.size(); ++i) {
-            Object* obj = objects[i];
-            const std::string& name = obj->getName();
-
-            // simple filter
-            if (ui.filter[0] != '\0' &&
-                name.find(ui.filter) == std::string::npos) {
-                continue;
-            }
-
-            bool isSelected = (ui.selected == obj);
-            if (ImGui::Selectable(name.c_str(), isSelected)) {
-                ui.selected      = obj;
-                ui.selectedIndex = i;
-                std::snprintf(ui.nameBuf, sizeof(ui.nameBuf), "%s", obj->getName().c_str());
-                ui.nameBufOwner = obj;
-                ImGui::SetWindowFocus("Inspector");
-            }
-
-            //save for later
-            if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {}
-        }
-
-        ImGui::End();
-
-
-        // Inspector window
-        ImGui::Begin("Inspector");
-
-        if (!ui.selected) {
-            ImGui::TextUnformatted("No object selected.");
-            ImGui::End();
-        } else {
-            Object* obj = ui.selected;
-            if (ui.nameBufOwner != obj) {
-                std::snprintf(ui.nameBuf, sizeof(ui.nameBuf), "%s", obj->getName().c_str());
-                ui.nameBufOwner = obj;
-            }
-
-            // Editable name
-            ImGuiInputTextFlags nameFlags =
-                ImGuiInputTextFlags_AutoSelectAll |
-                ImGuiInputTextFlags_EnterReturnsTrue;
-
-            bool submitted = ImGui::InputText("Name", ui.nameBuf, IM_ARRAYSIZE(ui.nameBuf), nameFlags);
-            if (submitted || (ImGui::IsItemDeactivatedAfterEdit())) {
-                std::string newName = ui.nameBuf;
-                auto l = newName.find_first_not_of(" \t\r\n");
-                auto r = newName.find_last_not_of(" \t\r\n");
-                if (l == std::string::npos) newName.clear();
-                else newName = newName.substr(l, r - l + 1);
-
-                if (!newName.empty() && newName != obj->getName()) {
-                    obj->setName(newName);
-                }
-            }
-
-            ImGui::Separator();
-
-            glm::vec3 pos = obj->getPosition();
-            if (ImGui::DragFloat3("Position", &pos.x, 0.05f)) obj->setPosition(pos);
-
-            glm::vec3 eulerDeg = glm::degrees(glm::eulerAngles(obj->getRotation()));
-            if (ImGui::DragFloat3("Rotation (deg)", &eulerDeg.x, 0.5f))
-                obj->setRotation(eulerDegreesToQuat(eulerDeg));
-
-            glm::vec3 scale = obj->getScale();
-            if (ImGui::DragFloat3("Scale", &scale.x, 0.01f))
-                obj->setScale(scale);
-
-            if (ImGui::Button("Center on Origin")) {
-                obj->setPosition(glm::vec3(0.0f));
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Reset Rotation")) {
-                obj->setRotation(eulerDegreesToQuat(glm::vec3(0.0f)));
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Reset Scale")) {
-                obj->setScale(glm::vec3(1.0f));
-            }
-
-            ImGui::End();
-        }
-
-
-        //DEBUG WINDOW
-        static int counter = 0;
-        ImGui::Begin("George Engine Debug Menu", nullptr, ImGuiWindowFlags_None);  
-        ImGui::Text("Debug controls"); 
-
-        // Basic options
-        if (ImGui::TreeNode("Light Options"))
-        {
-            ImGui::Checkbox("Use Ambient?", &useAmbient);
-            ImGui::Checkbox("Use Diffuse?", &useDiffuse);  
-            ImGui::Checkbox("Use Specular?", &useSpecular); 
-            ImGui::Checkbox("Use blinn-phong?", &useBlinn); 
-            ImGui::Checkbox("Use Gamma Correction?", &gammaCorrection);
-            ImGui::Checkbox("Use Flashlight?", &useFlashlight);
-            if(ImGui::TreeNode("Directional Light Options")) 
-            {
-                ImGui::Checkbox("Use Directional Light?", &useDirectionalLight); 
-                ImGui::Checkbox("Animate Dir Light", &animateDirLight);
-                ImGui::SliderFloat("Dir Orbit Speed", &orbitSpeed, 0.0f, 2.0f);
-                ImGui::SliderFloat("Dir Orbit Radius", &orbitRadius, 0.0f, 128.0f);
-                ImGui::SliderFloat2("Dir Orbit Center (x,z)", &orbitCenter.x, -64.0f, 64.0f);
-                ImGui::SliderFloat3("Direction Light Position (NOT ROTATION)", &lightPos.x, -20.0f, 20.0f);
-                ImGui::SliderFloat("Directional Light Intensity", &directionLightIntensity, 0.0f, 4.0f);
-                ImGui::TreePop();
-            }
-            ImGui::Checkbox("Use Point Light?", &usePointLight); 
-            ImGui::Checkbox("Use Shadows?", &useShadows);
-            ImGui::Checkbox("Use Smooth Shadows?", &useSmoothShadows);
-            ImGui::Checkbox("Use Normal Maps?", &useNormalMaps);
-            ImGui::SliderFloat("Shadow Blending", &shadowFactor, 0.0f, 1.0f);
-            ImGui::SliderFloat("Shadow Bias", &shadowBias, 0.0f, 0.2f);
-            ImGui::SliderFloat("Dir. Shadow Bias", &dirShadowBias, 0.0f, 0.2f);
-            ImGui::SliderFloat("Point Light Radius", &pointLightRadius, 0.0f, 100.0f);
-            static const char* light[] = { "red", "blue", "white", "green" };
-            static int selectedLight = 0;
-
-            if (ImGui::Combo("Light Selector", &selectedLight, light, IM_ARRAYSIZE(light)))
-            {
-                // Combo logic here if needed (e.g., firing an event)
-            }
-
-            // Display the corresponding slider based on the selected light
-            if (selectedLight == 0) 
-            {
-                ImGui::SliderFloat3("Light 1 Position", &sr.getpointLights()[0].x, -20.0f, 20.0f);
-            } 
-            else if (selectedLight == 1) 
-            {
-                ImGui::SliderFloat3("Light 2 Position", &sr.getpointLights()[1].x, -20.0f, 20.0f);
-            }
-            else if (selectedLight == 2) 
-            {
-                ImGui::SliderFloat3("Light 2 Position", &sr.getpointLights()[2].x, -20.0f, 20.0f);
-            }
-            else if (selectedLight == 3) 
-            {
-                ImGui::SliderFloat3("Light 2 Position", &sr.getpointLights()[3].x, -20.0f, 20.0f);
-            }
-
-            //ImGui::ColorEdit3("clear color", (float*)&clear_color);
-            ImGui::SliderFloat("Flashlight Intensity", &flashlightIntensity, 0.0f, 4.0f);
-            ImGui::SliderFloat("Pointlight Intensity", &pointLightIntensity, 0.0f, 4.0f);
-            ImGui::TreePop();
-        }
-
-        if (ImGui::TreeNode("Post-Processing Options"))
-        {
-            ImGui::Checkbox("Use MSAA?", &useMSAA);
-            ImGui::Checkbox("Show depth buffer?", &showDepthBuffer);
-            ImGui::Checkbox("wireframe?", &wireFrame);
-            ImGui::Checkbox("Render to texture?", &renderToTexture);
-            ImGui::Checkbox("invert?", &inverted);
-            ImGui::Checkbox("grayscale?", &grayscale);
-            ImGui::Checkbox("sharpen?", &sharpen);
-            ImGui::Checkbox("blur?", &blur);
-            ImGui::Checkbox("edge detection?", &edgeDetection);
-            ImGui::SliderFloat("exposure", &exposure, 0.1, 1.0f);
-            ImGui::TreePop();
-        }
-
-
-        static const char* items[]{"Day","Night", "Space1", "Space2"};
-        static int Selecteditem = 4;
-        if (ImGui::Combo("Skybox Selector", &Selecteditem, items, IM_ARRAYSIZE(items)))
-        {
-            // Here event is fired
-            if(Selecteditem == 0) { currSkybox = cubemapTextureDay; }
-            else if(Selecteditem == 1) { currSkybox = cubemapTextureNight; }
-            else if(Selecteditem == 2) { currSkybox = cubemapTextureSpace1; }
-            else if(Selecteditem == 3) { currSkybox = cubemapTextureSpace2; }
-        }
-
-        ImGui::SliderInt("ShadowTexture", &shadowItem, 0, 36);
-        ImGui::Checkbox("Show Depth Map?", &showDepthMap);
-
-        if (ImGui::Button("Close Application")) { glfwSetWindowShouldClose(window, true); }
-
-        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-        ImGui::Text("CamX %0.1f CamY %0.1f CamZ %0.1f", camera->Position.x, camera->Position.y, camera->Position.z);
-        ImGui::Text("CamYaw %0.1f CamPitch %0.1f", std::fmod(camera->Yaw, 360), camera->Pitch);
-        ImGui::End();
-
-        // render the imgui window
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        ImGui::Render();
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        renderIMGUI(postProcessFramebuffer, camera, io, window);
 
         // swap chain and IO handling
         glfwSwapBuffers(window);
-        glfwPollEvents();    
+        glfwPollEvents();  
+        
     }
 
     // MARK: CLEANUP
@@ -821,4 +425,460 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
+}
+
+// MARK: first pass function
+glm::mat4 Renderer::firstPass(Shader depthShader, Framebuffer framebuffer, Framebuffer depthMapBuffer, Framebuffer* pointLightsBuffers, Shader pointDepthShader, int fbWidth, int fbHeight) {
+    //variables for shadowing
+    glm::mat4 lightProjection, lightView, lightSpaceMatrix;
+    float near_plane = 0.1f, far_plane = 100.0f;
+    lightProjection = glm::ortho(-20.0f, 20.0f, -20.0f, 20.0f, near_plane, far_plane);
+    lightView = glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    lightSpaceMatrix = lightProjection * lightView;
+
+    glCullFace(GL_FRONT);
+    depthShader.use();
+    depthShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+    glBindFramebuffer(GL_FRAMEBUFFER, depthMapBuffer.ID);
+    glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+    glClear(GL_DEPTH_BUFFER_BIT);
+    for (Object* obj : objects) {
+        if(!obj->is_light()) {
+            obj->Draw(depthShader);
+        }
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.ID);
+    glViewport(0, 0, fbWidth, fbHeight);
+
+    // clear the buffers
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+    // create depth cubemap transformation matrices
+    float point_near_plane = 0.1f;
+    float point_far_plane = 25.0f;
+
+    // render scene to depth cubemap for each point light
+    constexpr int MAX_POINT_LIGHTS = 8;                 
+    int n = std::min(NUM_POINT_LIGHTS, MAX_POINT_LIGHTS);
+    for (int i = 0; i < n; i++) {
+        glm::mat4 shadowProj = glm::perspective(glm::radians(90.0f), (float)POINT_SHADOW_WIDTH / (float)POINT_SHADOW_HEIGHT, point_near_plane, point_far_plane);
+        std::vector<glm::mat4> shadowTransforms;
+        shadowTransforms.push_back(shadowProj * glm::lookAt(lights[i]->getPosition(), lights[i]->getPosition() + glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)));
+        shadowTransforms.push_back(shadowProj * glm::lookAt(lights[i]->getPosition(), lights[i]->getPosition() + glm::vec3(-1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)));
+        shadowTransforms.push_back(shadowProj * glm::lookAt(lights[i]->getPosition(), lights[i]->getPosition() + glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)));
+        shadowTransforms.push_back(shadowProj * glm::lookAt(lights[i]->getPosition(), lights[i]->getPosition() + glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f)));
+        shadowTransforms.push_back(shadowProj * glm::lookAt(lights[i]->getPosition(), lights[i]->getPosition() + glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, -1.0f, 0.0f)));
+        shadowTransforms.push_back(shadowProj * glm::lookAt(lights[i]->getPosition(), lights[i]->getPosition() + glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, -1.0f, 0.0f)));
+        glViewport(0, 0, POINT_SHADOW_WIDTH, POINT_SHADOW_HEIGHT);
+        glBindFramebuffer(GL_FRAMEBUFFER, pointLightsBuffers[i].ID);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        pointDepthShader.use();
+        for (unsigned int face = 0; face < 6; ++face) { pointDepthShader.setMat4("shadowMatrices[" + std::to_string(face) + "]", shadowTransforms[face]); }
+        pointDepthShader.setFloat("far_plane", point_far_plane);
+        pointDepthShader.setVec3("lightPos", lights[i]->getPosition());
+        for (Object* obj : objects) {
+            if(!obj->is_light()) {
+                obj->Draw(pointDepthShader);
+            }
+        }
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glViewport(0, 0, fbWidth, fbHeight);
+        glActiveTexture(GL_TEXTURE0 + 5 + i);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, pointLightsBuffers[i].texture);
+    }
+
+    //setting shadow texture
+    glActiveTexture(GL_TEXTURE0 + 4);
+    glBindTexture(GL_TEXTURE_2D, depthMapBuffer.texture);
+
+
+    return lightSpaceMatrix;
+}
+
+// MARK: initialize ImGUI
+ImGuiIO& Renderer::initImGui(GLFWwindow* window) {
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); 
+    (void)io;
+    ImGui::StyleColorsDark();
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init("#version 130");
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;;
+    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+    ImGuiStyle& style = ImGui::GetStyle();
+    style.WindowPadding = ImVec2(0.0f, 0.0f);       
+    style.WindowBorderSize = 0.0f;                
+    style.FramePadding = ImVec2(4.0f, 4.0f); 
+    style.ItemSpacing = ImVec2(4.0f, 4.0f);     
+    style.TabBorderSize = 0.0f;   
+    style.WindowRounding = 0.0f;  
+
+    return io;
+}
+
+//MARK: IMGUI render function
+void Renderer::renderIMGUI(Framebuffer postProcessFramebuffer, Camera* camera, ImGuiIO& io, GLFWwindow* window) {
+    // Set up fullscreen host window for DockSpace
+    ImGuiWindowFlags dockspace_window_flags = 0;
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(viewport->Pos);
+    ImGui::SetNextWindowSize(viewport->Size);
+    ImGui::SetNextWindowViewport(viewport->ID);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+
+    dockspace_window_flags |= ImGuiWindowFlags_NoTitleBar 
+                            | ImGuiWindowFlags_NoCollapse 
+                            | ImGuiWindowFlags_NoResize 
+                            | ImGuiWindowFlags_NoMove 
+                            | ImGuiWindowFlags_NoBringToFrontOnFocus 
+                            | ImGuiWindowFlags_NoNavFocus;
+
+
+    //DOCKSPACE
+    ImGui::Begin("DockSpaceRoot", nullptr, dockspace_window_flags);
+    ImGui::PopStyleVar(3);
+    ImGuiID dockspace_id = ImGui::GetID("GeorgeDockspace");
+    ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_None;
+    ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
+    static bool first_time = true;
+    if (first_time) {
+        ImGui::DockBuilderRemoveNode(dockspace_id);
+        ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
+        ImGui::DockBuilderSetNodeSize(dockspace_id, viewport->Size);
+
+        ImGuiID dock_main_id = dockspace_id;
+        ImGuiID dock_bottom = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Down, 0.3f, nullptr, &dock_main_id);
+        ImGuiID dock_right = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Right, 0.2f, nullptr, &dock_main_id);
+        ImGuiID dock_left = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Left, 0.2f, nullptr, &dock_main_id);
+
+        ImGui::DockBuilderDockWindow("Scene", dock_main_id);
+        ImGui::DockBuilderDockWindow("Inspector", dock_right);
+        ImGui::DockBuilderDockWindow("Hierarchy", dock_left);
+        ImGui::DockBuilderDockWindow("George Engine Debug Menu", dock_bottom);
+
+        ImGui::DockBuilderFinish(dockspace_id);
+        first_time = false;
+    }
+    ImGui::End();
+
+    ImGui::Begin("Scene", nullptr, ImGuiWindowFlags_None);
+    const float toolbarH = ImGui::GetFrameHeightWithSpacing();
+    ImGui::BeginChild("##Toolbar", ImVec2(0, toolbarH), false, ImGuiWindowFlags_NoScrollbar);
+
+    ImGui::TextUnformatted("Transform:");
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Translate", gizmoOp == ImGuizmo::TRANSLATE)) gizmoOp = ImGuizmo::TRANSLATE;
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Rotate", gizmoOp == ImGuizmo::ROTATE)) gizmoOp = ImGuizmo::ROTATE;
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Scale", gizmoOp == ImGuizmo::SCALE)) gizmoOp = ImGuizmo::SCALE;
+
+    ImGui::SameLine();
+    ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+    ImGui::SameLine();
+    if (ImGui::RadioButton("World", gizmoMode == ImGuizmo::WORLD)) gizmoMode = ImGuizmo::WORLD;
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Local", gizmoMode == ImGuizmo::LOCAL)) gizmoMode = ImGuizmo::LOCAL;
+
+    ImGui::SameLine();
+    ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+    ImGui::SameLine();
+    ImGui::Checkbox("Snap", &useSnap);
+    if (useSnap) {
+        if (gizmoOp == ImGuizmo::TRANSLATE)      { ImGui::SameLine(); ImGui::InputFloat3("ΔT", snapTranslate); }
+        else if (gizmoOp == ImGuizmo::ROTATE)    { ImGui::SameLine(); ImGui::InputFloat ("ΔR (deg)", &snapRotateDeg); }
+        else                                     { ImGui::SameLine(); ImGui::InputFloat3("ΔS", snapScale); }
+    }
+    ImGui::EndChild();
+
+    ImGui::BeginChild("##Viewport",
+                    ImVec2(0, 0),
+                    false,
+                    ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+    ImVec2 vAvail = ImGui::GetContentRegionAvail();
+    ImGui::Image((void*)(intptr_t)postProcessFramebuffer.texture, vAvail, ImVec2(0,1), ImVec2(1,0));
+    if (ui.selected) {
+        ImGuizmo::SetOrthographic(false);
+        ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList()); 
+        const ImVec2 vPos   = ImGui::GetWindowPos();
+        const ImVec2 vMin   = ImGui::GetWindowContentRegionMin();
+        const ImVec2 vMax   = ImGui::GetWindowContentRegionMax();
+        const ImVec2 tl     = ImVec2(vPos.x + vMin.x, vPos.y + vMin.y);
+        const float  gW     = vMax.x - vMin.x;
+        const float  gH     = vMax.y - vMin.y;
+        ImGuizmo::SetRect(tl.x, tl.y, gW, gH);
+        glm::mat4 view = camera->GetViewMatrix();
+        glm::mat4 proj = camera->GetProjectionMatrix(gW, gH);
+        glm::mat4 model = ui.selected->getModelMatrix();
+        const float* snapPtr = nullptr;
+        if (useSnap) {
+            if      (gizmoOp == ImGuizmo::TRANSLATE) snapPtr = snapTranslate;
+            else if (gizmoOp == ImGuizmo::ROTATE)    snapPtr = &snapRotateDeg;
+            else                                     snapPtr = snapScale; 
+        }
+
+        ImGuizmo::Manipulate(glm::value_ptr(view),
+                            glm::value_ptr(proj),
+                            gizmoOp,
+                            gizmoMode,
+                            glm::value_ptr(model),
+                            nullptr,
+                            snapPtr);
+
+        if (ImGuizmo::IsUsing()) {
+            const glm::vec3 T(model[3].x, model[3].y, model[3].z);
+            glm::mat3 B(model);
+            glm::vec3 S(glm::length(B[0]), glm::length(B[1]), glm::length(B[2]));
+            const float kEps = 1e-8f;
+            if (S.x < kEps) S.x = kEps;
+            if (S.y < kEps) S.y = kEps;
+            if (S.z < kEps) S.z = kEps;
+            B[0] /= S.x;
+            B[1] /= S.y;
+            B[2] /= S.z;
+
+            if (glm::determinant(B) < 0.0f) {
+                S.x = -S.x;
+                B[0] = -B[0];
+            }
+
+            glm::quat R_from_matrix = glm::normalize(glm::quat_cast(B));
+
+            glm::quat R = (gizmoOp == ImGuizmo::SCALE)
+                            ? ui.selected->getRotation()
+                            : R_from_matrix;
+
+            ui.selected->setPosition(T);
+            ui.selected->setRotation(R); 
+            ui.selected->setScale(S);
+        }
+    }
+
+    ImGui::EndChild();
+    ImGui::End();
+
+    // SHADOW MAP VIEW WINDOW
+    // ImGui::Begin("Shadow Map");
+    // ImVec2 shadowSize = ImGui::GetContentRegionAvail();
+    // ImGui::Image((void*)(intptr_t)depthMapBuffer.texture, shadowSize, ImVec2(0, 1), ImVec2(1, 0),
+    //      ImVec4(1,1,1,1), ImVec4(0,0,0,0));
+    // ImGui::End();
+
+    // --- HIERARCHY WINDOW ---
+    ImGui::Begin("Hierarchy");
+    ImGui::InputTextWithHint("##filter", "Filter objects...", ui.filter, IM_ARRAYSIZE(ui.filter));
+    ImGui::Separator();
+
+    for (int i = 0; i < (int)objects.size(); ++i) {
+        Object* obj = objects[i];
+        const std::string& name = obj->getName();
+
+        // simple filter
+        if (ui.filter[0] != '\0' &&
+            name.find(ui.filter) == std::string::npos) {
+            continue;
+        }
+
+        bool isSelected = (ui.selected == obj);
+        if (ImGui::Selectable(name.c_str(), isSelected)) {
+            ui.selected      = obj;
+            ui.selectedIndex = i;
+            std::snprintf(ui.nameBuf, sizeof(ui.nameBuf), "%s", obj->getName().c_str());
+            ui.nameBufOwner = obj;
+            ImGui::SetWindowFocus("Inspector");
+        }
+
+        //save for later
+        if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {}
+    }
+
+    ImGui::End();
+
+
+    // Inspector window
+    ImGui::Begin("Inspector");
+
+    if (!ui.selected) {
+        ImGui::TextUnformatted("No object selected.");
+        ImGui::End();
+    } else {
+        Object* obj = ui.selected;
+        if (ui.nameBufOwner != obj) {
+            std::snprintf(ui.nameBuf, sizeof(ui.nameBuf), "%s", obj->getName().c_str());
+            ui.nameBufOwner = obj;
+        }
+
+        // Editable name
+        ImGuiInputTextFlags nameFlags =
+            ImGuiInputTextFlags_AutoSelectAll |
+            ImGuiInputTextFlags_EnterReturnsTrue;
+
+        bool submitted = ImGui::InputText("Name", ui.nameBuf, IM_ARRAYSIZE(ui.nameBuf), nameFlags);
+        if (submitted || (ImGui::IsItemDeactivatedAfterEdit())) {
+            std::string newName = ui.nameBuf;
+            auto l = newName.find_first_not_of(" \t\r\n");
+            auto r = newName.find_last_not_of(" \t\r\n");
+            if (l == std::string::npos) newName.clear();
+            else newName = newName.substr(l, r - l + 1);
+
+            if (!newName.empty() && newName != obj->getName()) {
+                obj->setName(newName);
+            }
+        }
+
+        ImGui::Separator();
+
+        glm::vec3 pos = obj->getPosition();
+        if (ImGui::DragFloat3("Position", &pos.x, 0.05f)) obj->setPosition(pos);
+
+        glm::vec3 eulerDeg = glm::degrees(glm::eulerAngles(obj->getRotation()));
+        if (ImGui::DragFloat3("Rotation (deg)", &eulerDeg.x, 0.5f))
+            obj->setRotation(eulerDegreesToQuat(eulerDeg));
+
+        glm::vec3 scale = obj->getScale();
+        if (ImGui::DragFloat3("Scale", &scale.x, 0.01f))
+            obj->setScale(scale);
+
+        if (ImGui::Button("Center on Origin")) {
+            obj->setPosition(glm::vec3(0.0f));
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Reset Rotation")) {
+            obj->setRotation(eulerDegreesToQuat(glm::vec3(0.0f)));
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Reset Scale")) {
+            obj->setScale(glm::vec3(1.0f));
+        }
+
+        if (obj->is_light()) {
+            glm::vec3 color = obj->getLightColor();
+
+            float col[3] = { color.x, color.y, color.z };
+            if (ImGui::ColorEdit3("Light Color", col,
+                                ImGuiColorEditFlags_Float |
+                                ImGuiColorEditFlags_NoInputs))
+            {
+                obj->setLightColor(glm::clamp(
+                    glm::vec3(col[0], col[1], col[2]),
+                    glm::vec3(0.0f),
+                    glm::vec3(1.0f)
+                ));
+            }
+        }
+
+        ImGui::End();
+    }
+
+
+    //DEBUG WINDOW
+    static int counter = 0;
+    ImGui::Begin("George Engine Debug Menu", nullptr, ImGuiWindowFlags_None);  
+    ImGui::Text("Debug controls"); 
+
+    // Basic options
+    if (ImGui::TreeNode("Light Options"))
+    {
+        ImGui::Checkbox("Use Ambient?", &useAmbient);
+        ImGui::Checkbox("Use Diffuse?", &useDiffuse);  
+        ImGui::Checkbox("Use Specular?", &useSpecular); 
+        ImGui::Checkbox("Use blinn-phong?", &useBlinn); 
+        ImGui::Checkbox("Use Gamma Correction?", &gammaCorrection);
+        ImGui::Checkbox("Use Flashlight?", &useFlashlight);
+        if(ImGui::TreeNode("Directional Light Options")) 
+        {
+            ImGui::Checkbox("Use Directional Light?", &useDirectionalLight); 
+            ImGui::Checkbox("Animate Dir Light", &animateDirLight);
+            ImGui::SliderFloat("Dir Orbit Speed", &orbitSpeed, 0.0f, 2.0f);
+            ImGui::SliderFloat("Dir Orbit Radius", &orbitRadius, 0.0f, 128.0f);
+            ImGui::SliderFloat2("Dir Orbit Center (x,z)", &orbitCenter.x, -64.0f, 64.0f);
+            ImGui::SliderFloat3("Direction Light Position (NOT ROTATION)", &lightPos.x, -20.0f, 20.0f);
+            ImGui::SliderFloat("Directional Light Intensity", &directionLightIntensity, 0.0f, 4.0f);
+            ImGui::TreePop();
+        }
+        ImGui::Checkbox("Use Point Light?", &usePointLight); 
+        ImGui::Checkbox("Use Shadows?", &useShadows);
+        ImGui::Checkbox("Use Smooth Shadows?", &useSmoothShadows);
+        ImGui::Checkbox("Use Normal Maps?", &useNormalMaps);
+        ImGui::SliderFloat("Shadow Blending", &shadowFactor, 0.0f, 1.0f);
+        ImGui::SliderFloat("Shadow Bias", &shadowBias, 0.0f, 0.2f);
+        ImGui::SliderFloat("Dir. Shadow Bias", &dirShadowBias, 0.0f, 0.2f);
+        ImGui::SliderFloat("Point Light Radius", &pointLightRadius, 0.0f, 100.0f);
+        static const char* light[] = { "red", "blue", "white", "green" };
+        static int selectedLight = 0;
+
+        if (ImGui::Combo("Light Selector", &selectedLight, light, IM_ARRAYSIZE(light)))
+        {
+            // Combo logic here if needed (e.g., firing an event)
+        }
+
+        // Display the corresponding slider based on the selected light
+        if (selectedLight == 0) 
+        {
+            ImGui::SliderFloat3("Light 1 Position", &sr.getpointLights()[0].x, -20.0f, 20.0f);
+        } 
+        else if (selectedLight == 1) 
+        {
+            ImGui::SliderFloat3("Light 2 Position", &sr.getpointLights()[1].x, -20.0f, 20.0f);
+        }
+        else if (selectedLight == 2) 
+        {
+            ImGui::SliderFloat3("Light 2 Position", &sr.getpointLights()[2].x, -20.0f, 20.0f);
+        }
+        else if (selectedLight == 3) 
+        {
+            ImGui::SliderFloat3("Light 2 Position", &sr.getpointLights()[3].x, -20.0f, 20.0f);
+        }
+
+        //ImGui::ColorEdit3("clear color", (float*)&clear_color);
+        ImGui::SliderFloat("Flashlight Intensity", &flashlightIntensity, 0.0f, 4.0f);
+        ImGui::SliderFloat("Pointlight Intensity", &pointLightIntensity, 0.0f, 4.0f);
+        ImGui::TreePop();
+    }
+
+    if (ImGui::TreeNode("Post-Processing Options"))
+    {
+        ImGui::Checkbox("Use MSAA?", &useMSAA);
+        ImGui::Checkbox("Show depth buffer?", &showDepthBuffer);
+        ImGui::Checkbox("wireframe?", &wireFrame);
+        ImGui::Checkbox("Render to texture?", &renderToTexture);
+        ImGui::Checkbox("invert?", &inverted);
+        ImGui::Checkbox("grayscale?", &grayscale);
+        ImGui::Checkbox("sharpen?", &sharpen);
+        ImGui::Checkbox("blur?", &blur);
+        ImGui::Checkbox("edge detection?", &edgeDetection);
+        ImGui::SliderFloat("exposure", &exposure, 0.1, 1.0f);
+        ImGui::TreePop();
+    }
+
+
+    static const char* items[]{"Day","Night", "Space1", "Space2"};
+    static int Selecteditem = 4;
+    if (ImGui::Combo("Skybox Selector", &Selecteditem, items, IM_ARRAYSIZE(items)))
+    {
+        // Here event is fired
+        if(Selecteditem == 0) { currSkybox = cubemapTextureDay; }
+        else if(Selecteditem == 1) { currSkybox = cubemapTextureNight; }
+        else if(Selecteditem == 2) { currSkybox = cubemapTextureSpace1; }
+        else if(Selecteditem == 3) { currSkybox = cubemapTextureSpace2; }
+    }
+
+    ImGui::SliderInt("ShadowTexture", &shadowItem, 0, 36);
+    ImGui::Checkbox("Show Depth Map?", &showDepthMap);
+
+    if (ImGui::Button("Close Application")) { glfwSetWindowShouldClose(window, true); }
+
+    ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+    ImGui::Text("CamX %0.1f CamY %0.1f CamZ %0.1f", camera->Position.x, camera->Position.y, camera->Position.z);
+    ImGui::Text("CamYaw %0.1f CamPitch %0.1f", std::fmod(camera->Yaw, 360), camera->Pitch);
+    ImGui::Text("NUM_POINT_LIGHTS %d", NUM_POINT_LIGHTS);
+    ImGui::End();
+
+    // render the imgui window
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData()); 
 }
