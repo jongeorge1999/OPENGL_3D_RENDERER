@@ -810,12 +810,6 @@ void Renderer::renderIMGUI(Framebuffer postProcessFramebuffer, Camera* camera, I
     // Basic options
     if (ImGui::TreeNode("Light Options"))
     {
-        ImGui::Checkbox("Use Ambient?", &useAmbient);
-        ImGui::Checkbox("Use Diffuse?", &useDiffuse);  
-        ImGui::Checkbox("Use Specular?", &useSpecular); 
-        ImGui::Checkbox("Use blinn-phong?", &useBlinn); 
-        ImGui::Checkbox("Use Gamma Correction?", &gammaCorrection);
-        ImGui::Checkbox("Use Flashlight?", &useFlashlight);
         if(ImGui::TreeNode("Directional Light Options")) 
         {
             ImGui::Checkbox("Use Directional Light?", &useDirectionalLight); 
@@ -827,43 +821,57 @@ void Renderer::renderIMGUI(Framebuffer postProcessFramebuffer, Camera* camera, I
             ImGui::SliderFloat("Directional Light Intensity", &directionLightIntensity, 0.0f, 4.0f);
             ImGui::TreePop();
         }
-        ImGui::Checkbox("Use Point Light?", &usePointLight); 
-        ImGui::Checkbox("Use Shadows?", &useShadows);
-        ImGui::Checkbox("Use Smooth Shadows?", &useSmoothShadows);
-        ImGui::Checkbox("Use Normal Maps?", &useNormalMaps);
-        ImGui::SliderFloat("Shadow Blending", &shadowFactor, 0.0f, 1.0f);
-        ImGui::SliderFloat("Shadow Bias", &shadowBias, 0.0f, 0.2f);
-        ImGui::SliderFloat("Dir. Shadow Bias", &dirShadowBias, 0.0f, 0.2f);
-        ImGui::SliderFloat("Point Light Radius", &pointLightRadius, 0.0f, 100.0f);
-        static const char* light[] = { "red", "blue", "white", "green" };
-        static int selectedLight = 0;
+        if(ImGui::TreeNode("Point Light Options")) 
+        {
+            ImGui::Checkbox("Use Point Light?", &usePointLight); 
+            ImGui::SliderFloat("Point Light Radius", &pointLightRadius, 0.0f, 100.0f);
+            ImGui::SliderFloat("Pointlight Intensity", &pointLightIntensity, 0.0f, 4.0f);
+            ImGui::TreePop();
+        }
+        if(ImGui::TreeNode("Shadow Options"))
+        {
+            ImGui::Checkbox("Use Shadows?", &useShadows);
+            ImGui::Checkbox("Use Smooth Shadows?", &useSmoothShadows);
+            ImGui::Checkbox("Use Normal Maps?", &useNormalMaps);
+            ImGui::SliderFloat("Shadow Blending", &shadowFactor, 0.0f, 1.0f);
+            ImGui::SliderFloat("Shadow Bias", &shadowBias, 0.0f, 0.2f);
+            ImGui::SliderFloat("Dir. Shadow Bias", &dirShadowBias, 0.0f, 0.2f);
+            ImGui::TreePop();
+        }
+        ImGui::Checkbox("Use Ambient?", &useAmbient);
+        ImGui::Checkbox("Use Diffuse?", &useDiffuse);  
+        ImGui::Checkbox("Use Specular?", &useSpecular); 
+        ImGui::Checkbox("Use blinn-phong?", &useBlinn); 
+        ImGui::Checkbox("Use Gamma Correction?", &gammaCorrection);
+        ImGui::Checkbox("Use Flashlight?", &useFlashlight);
+        // static const char* light[] = { "red", "blue", "white", "green" };
+        // static int selectedLight = 0;
 
-        if (ImGui::Combo("Light Selector", &selectedLight, light, IM_ARRAYSIZE(light)))
-        {
-            // Combo logic here if needed (e.g., firing an event)
-        }
+        // if (ImGui::Combo("Light Selector", &selectedLight, light, IM_ARRAYSIZE(light)))
+        // {
+        //     // Combo logic here if needed (e.g., firing an event)
+        // }
 
-        // Display the corresponding slider based on the selected light
-        if (selectedLight == 0) 
-        {
-            ImGui::SliderFloat3("Light 1 Position", &sr.getpointLights()[0].x, -20.0f, 20.0f);
-        } 
-        else if (selectedLight == 1) 
-        {
-            ImGui::SliderFloat3("Light 2 Position", &sr.getpointLights()[1].x, -20.0f, 20.0f);
-        }
-        else if (selectedLight == 2) 
-        {
-            ImGui::SliderFloat3("Light 2 Position", &sr.getpointLights()[2].x, -20.0f, 20.0f);
-        }
-        else if (selectedLight == 3) 
-        {
-            ImGui::SliderFloat3("Light 2 Position", &sr.getpointLights()[3].x, -20.0f, 20.0f);
-        }
+        // // Display the corresponding slider based on the selected light
+        // if (selectedLight == 0) 
+        // {
+        //     ImGui::SliderFloat3("Light 1 Position", &sr.getpointLights()[0].x, -20.0f, 20.0f);
+        // } 
+        // else if (selectedLight == 1) 
+        // {
+        //     ImGui::SliderFloat3("Light 2 Position", &sr.getpointLights()[1].x, -20.0f, 20.0f);
+        // }
+        // else if (selectedLight == 2) 
+        // {
+        //     ImGui::SliderFloat3("Light 2 Position", &sr.getpointLights()[2].x, -20.0f, 20.0f);
+        // }
+        // else if (selectedLight == 3) 
+        // {
+        //     ImGui::SliderFloat3("Light 2 Position", &sr.getpointLights()[3].x, -20.0f, 20.0f);
+        // }
 
         //ImGui::ColorEdit3("clear color", (float*)&clear_color);
         ImGui::SliderFloat("Flashlight Intensity", &flashlightIntensity, 0.0f, 4.0f);
-        ImGui::SliderFloat("Pointlight Intensity", &pointLightIntensity, 0.0f, 4.0f);
         ImGui::TreePop();
     }
 
@@ -872,7 +880,7 @@ void Renderer::renderIMGUI(Framebuffer postProcessFramebuffer, Camera* camera, I
         ImGui::Checkbox("Use MSAA?", &useMSAA);
         ImGui::Checkbox("Show depth buffer?", &showDepthBuffer);
         ImGui::Checkbox("wireframe?", &wireFrame);
-        ImGui::Checkbox("Render to texture?", &renderToTexture);
+        //ImGui::Checkbox("Render to texture?", &renderToTexture);
         ImGui::Checkbox("invert?", &inverted);
         ImGui::Checkbox("grayscale?", &grayscale);
         ImGui::Checkbox("sharpen?", &sharpen);
@@ -895,7 +903,7 @@ void Renderer::renderIMGUI(Framebuffer postProcessFramebuffer, Camera* camera, I
     }
 
     ImGui::SliderInt("ShadowTexture", &shadowItem, 0, 36);
-    ImGui::Checkbox("Show Depth Map?", &showDepthMap);
+    //ImGui::Checkbox("Show Depth Map?", &showDepthMap);
 
     if (ImGui::Button("Close Application")) { glfwSetWindowShouldClose(window, true); }
 
