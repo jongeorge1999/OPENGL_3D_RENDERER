@@ -82,15 +82,10 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     Object wallTop(&objectShader, "../models/wood_floor/wood_floor.obj", &objects, "WallTop", glm::vec3(16.0f, 3.0f, -0.3f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 0.0f)), false);
     Object wallBack(&objectShader, "../models/wood_floor/wood_floor.obj", &objects, "WallBack", glm::vec3(16.0f, 3.0f, -17.0f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(90.0f, 0.0f, 0.0f)), false);
     Object wallTest(&objectShader, "../models/wood_floor/wood_floor.obj", &objects, "WallTest", glm::vec3(0.0f, 1.0f, -15.0f), glm::vec3(0.25f, 0.25f, 0.25f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)), false);
-    Object light1(&objectShader, "../models/box/cube.obj", &objects, "Light 1", glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.2f, 0.2f, 0.2f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)), true);
-    Object light2(&objectShader, "../models/box/cube.obj", &objects, "Light 2", glm::vec3(0.5f, 0.0f, 0.0f), glm::vec3(0.2f, 0.2f, 0.2f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)), true);
+    Object light1(&objectShader, "../models/box/cube.obj", &objects, "Light 1", glm::vec3(-10.0f, 4.0f, -15.0f), glm::vec3(0.2f, 0.2f, 0.2f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)), true);
+    Object light2(&objectShader, "../models/box/cube.obj", &objects, "Light 2", glm::vec3(5.0f, 4.0f, -15.0f), glm::vec3(0.2f, 0.2f, 0.2f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)), true);
 
-    for (Object* obj: objects) {
-        if (obj->is_light()) {
-            NUM_POINT_LIGHTS++;
-            lights.push_back(obj);
-        }
-    }
+    for (Object* obj: objects) { if (obj->is_light()) { NUM_POINT_LIGHTS++; lights.push_back(obj); }}
     objectShader.use();
     objectShader.setInt("NR_POINT_LIGHTS", NUM_POINT_LIGHTS); 
 
@@ -264,17 +259,20 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
 
         // MARK: UNIFORM HELL
         objectShader.use();
+        constexpr int MAX_POINT_LIGHTS = 16;
+        int depthUnits[MAX_POINT_LIGHTS];
+        for (int i = 0; i < MAX_POINT_LIGHTS; ++i) { depthUnits[i] = 5 + i; }
+        GLint depthLoc = glGetUniformLocation(objectShader.ID, "depthCubeMap[0]");
+        glUniform1iv(depthLoc, MAX_POINT_LIGHTS, depthUnits);
         sr.setParams(objectShader, *camera);
         sr.updatePointLights(objectShader, lights);
         objectShader.setVec3("lightPos", lightPos);
         objectShader.setFloat("far_plane", 25.0f);
         objectShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
         objectShader.setInt("shadowMap", shadowItem);
-        constexpr int MAX_POINT_LIGHTS = 8;   
-        int n = std::min(NUM_POINT_LIGHTS, MAX_POINT_LIGHTS);
-        objectShader.setInt("NR_POINT_LIGHTS", n);
-        for (int i = 0; i < n; i++) { objectShader.setVec3("pointLightPos[" + std::to_string(i) + "]", lights[i]->getPosition()); }
-        for (int i = 0; i < n; i++) { objectShader.setInt("depthCubeMap[" + std::to_string(i) + "]", 5 + i); }
+        objectShader.setInt("NR_POINT_LIGHTS", NUM_POINT_LIGHTS);
+        for (int i = 0; i < NUM_POINT_LIGHTS; i++) { objectShader.setVec3("pointLightPos[" + std::to_string(i) + "]", lights[i]->getPosition()); }
+        // for (int i = 0; i < NUM_POINT_LIGHTS; i++) { objectShader.setInt("depthCubeMap[" + std::to_string(i) + "]", 5 + i); }
         
         // imgui uniforms
         objectShader.setBool("useAmbient", useAmbient);
@@ -442,11 +440,7 @@ glm::mat4 Renderer::firstPass(Shader depthShader, Framebuffer framebuffer, Frame
     glBindFramebuffer(GL_FRAMEBUFFER, depthMapBuffer.ID);
     glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
     glClear(GL_DEPTH_BUFFER_BIT);
-    for (Object* obj : objects) {
-        if(!obj->is_light()) {
-            obj->Draw(depthShader);
-        }
-    }
+    for (Object* obj : objects) { if(!obj->is_light()) { obj->Draw(depthShader); }}
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.ID);
     glViewport(0, 0, fbWidth, fbHeight);
 
@@ -458,9 +452,7 @@ glm::mat4 Renderer::firstPass(Shader depthShader, Framebuffer framebuffer, Frame
     float point_far_plane = 25.0f;
 
     // render scene to depth cubemap for each point light
-    constexpr int MAX_POINT_LIGHTS = 8;                 
-    int n = std::min(NUM_POINT_LIGHTS, MAX_POINT_LIGHTS);
-    for (int i = 0; i < n; i++) {
+    for (int i = 0; i < NUM_POINT_LIGHTS; i++) {
         glm::mat4 shadowProj = glm::perspective(glm::radians(90.0f), (float)POINT_SHADOW_WIDTH / (float)POINT_SHADOW_HEIGHT, point_near_plane, point_far_plane);
         std::vector<glm::mat4> shadowTransforms;
         shadowTransforms.push_back(shadowProj * glm::lookAt(lights[i]->getPosition(), lights[i]->getPosition() + glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)));
@@ -476,11 +468,7 @@ glm::mat4 Renderer::firstPass(Shader depthShader, Framebuffer framebuffer, Frame
         for (unsigned int face = 0; face < 6; ++face) { pointDepthShader.setMat4("shadowMatrices[" + std::to_string(face) + "]", shadowTransforms[face]); }
         pointDepthShader.setFloat("far_plane", point_far_plane);
         pointDepthShader.setVec3("lightPos", lights[i]->getPosition());
-        for (Object* obj : objects) {
-            if(!obj->is_light()) {
-                obj->Draw(pointDepthShader);
-            }
-        }
+        for (Object* obj : objects) { if(!obj->is_light()) { obj->Draw(pointDepthShader); }}
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glViewport(0, 0, fbWidth, fbHeight);
         glActiveTexture(GL_TEXTURE0 + 5 + i);

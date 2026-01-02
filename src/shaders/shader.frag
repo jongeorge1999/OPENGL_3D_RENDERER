@@ -54,7 +54,7 @@ uniform vec3 viewPos;
 
 uniform float far_plane;
 
-#define MAX_POINT_LIGHTS 2
+#define MAX_POINT_LIGHTS 16
 //#define NR_POINT_LIGHTS 4
 uniform int NR_POINT_LIGHTS;
 
@@ -156,14 +156,13 @@ void main() {
     
     // point lights
     if(usePointLight) {
-        int n = min(NR_POINT_LIGHTS, MAX_POINT_LIGHTS);
-        for(int i = 0; i < n; i++) { 
-            if(useNormalMaps) {
-                //result += CalcPointLight(pointLights[i], normalMap, FragPos, viewDirNormal, i) * pointLightIntensity; 
+        for(int i = 0; i < NR_POINT_LIGHTS; i++) { 
+            // if(useNormalMaps) {
+            //     //result += CalcPointLight(pointLights[i], normalMap, FragPos, viewDirNormal, i) * pointLightIntensity; 
+            //     result += CalcPointLight(pointLights[i], norm, FragPos, viewDir, i) * pointLightIntensity; 
+            // } else {
                 result += CalcPointLight(pointLights[i], norm, FragPos, viewDir, i) * pointLightIntensity; 
-            } else {
-                result += CalcPointLight(pointLights[i], norm, FragPos, viewDir, i) * pointLightIntensity; 
-            }
+            // }
         }
     }   
     // spot light
