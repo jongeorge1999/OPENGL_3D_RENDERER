@@ -6,6 +6,7 @@
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <memory>
 #include <vector>
 #include "Camera.hpp"
 #include "Controller.hpp"
@@ -30,9 +31,10 @@ class Renderer {
         const unsigned int POINT_SHADOW_HEIGHT = 1024;
 
         int NUM_POINT_LIGHTS = 0;
+        int MAX_POINT_LIGHTS = 16;
 
         //Game object manager
-        std::vector<Object*> objects;
+        std::vector<std::unique_ptr<Object>> objects;
         std::vector<Object*> lights;
 
         //Texture loader
@@ -101,6 +103,8 @@ class Renderer {
         glm::mat4 firstPass(Shader depthShader, Framebuffer framebuffer, Framebuffer depthMapBuffer, Framebuffer* pointLightsBuffer, Shader pointDepthShader, int fbWidth, int fbHeight);
         ImGuiIO& initImGui(GLFWwindow* window);
         void renderIMGUI(Framebuffer postProcessFramebuffer, Camera* camera, ImGuiIO& io, GLFWwindow* window);
+
+        void rebuildLights();
         
         unsigned int CopyTexture(GLuint srcTexture, GLenum target, int width, int height)
         {

@@ -35,27 +35,31 @@ private:
     }
 
 public:
-    Object(Shader* shaderIn = nullptr, const std::string& modelPath = "", std::vector<Object*> *vec = nullptr, const std::string& objName = "", glm::vec3 objPos = glm::vec3(0.0f), glm::vec3 objScale = glm::vec3(1.0f), glm::quat objRot = glm::quat(1.0f, 0.0f, 0.0f, 0.0f), bool is_light = false)
-        : 
-          objects(vec),
-          position(objPos), 
-          rotation(objRot), 
-          scale(objScale), modelMatrix(glm::mat4(1.0f)), 
-          name(objName),
-          model(modelPath),
-          shaderStored(shaderIn),
-          isLight(is_light)
-          { 
-            updateModelMatrix();
-            if (is_light) {
-                static std::mt19937 rng{ std::random_device{}() };
-                float r = std::uniform_real_distribution<float>(0.0f, 1.0f)(rng);
-                float g = std::uniform_real_distribution<float>(0.0f, 1.0f)(rng);
-                float b = std::uniform_real_distribution<float>(0.0f, 1.0f)(rng);
-                lightColor = glm::vec3(r,g,b);
-            }
-            vec->push_back(this);
+    Object(Shader* shaderIn = nullptr,
+        const std::string& modelPath = "",
+        const std::string& objName = "",
+        glm::vec3 objPos   = glm::vec3(0.0f),
+        glm::vec3 objScale = glm::vec3(1.0f),
+        glm::quat objRot   = glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
+        bool is_light      = false)
+        :
+        position(objPos),
+        rotation(objRot),
+        scale(objScale),
+        modelMatrix(glm::mat4(1.0f)),
+        name(objName),
+        model(modelPath),
+        shaderStored(shaderIn),
+        isLight(is_light)
+    {
+        updateModelMatrix();
+
+        if (isLight) {
+            static std::mt19937 rng{ std::random_device{}() };
+            std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+            lightColor = glm::vec3(dist(rng), dist(rng), dist(rng));
         }
+    }
 
     glm::vec3& getLightColor() {
         return lightColor;

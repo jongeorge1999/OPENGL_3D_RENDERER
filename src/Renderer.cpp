@@ -21,6 +21,7 @@
 #include <string>
 #include <cstring>
 #include <format>
+#include <algorithm>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -64,28 +65,34 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
     Shader normalShader("../src/shaders/normals.vert", "../src/shaders/normals.frag",  "../src/shaders/normals.geom");
     Shader depthShader("../src/shaders/depthShader.vert", "../src/shaders/depthShader.frag");
     Shader depthTestShader("../src/shaders/depthTestShader.vert", "../src/shaders/depthTestShader.frag");
-    Shader pointDepthShader("../src/shaders/pointDepthShader.vert", "../src/shaders/pointDepthShader.frag",  "../src/shaders/pointDepthShader.geom");
+    Shader pointDepthShader("../src/shaders/pointDepthShader.vert", "../src/shaders/pointDepthShader.frag", "../src/shaders/pointDepthShader.geom");
     Shader normalMapShader("../src/shaders/normalMap.vert", "../src/shaders/normalMap.frag");
     Shader parallaxShader("../src/shaders/parallaxMapping.vert", "../src/shaders/parallaxMapping.frag");
 
 
     //create game objects
-    Object stormtrooper(&objectShader, "../models/stormtrooper/stormtrooper.obj", &objects, "Stormtrooper", glm::vec3(4.0f, -0.9f, -2.5f));
-    Object backpack(&objectShader, "../models/backpack/backpack.obj", &objects, "backpack", glm::vec3(-9.5f, 0.1f, 1.5f), glm::vec3(0.5f));
-    Object brickWall(&objectShader, "../models/brick_wall/brick_wall.obj", &objects, "Brick Wall", glm::vec3(-7.5f, 0.5f, -3.5f), glm::vec3(0.1f));
-    Object floor(&objectShader, "../models/wood_floor/wood_floor.obj", &objects, "floor", glm::vec3(0.0f, -1.0f, 0.0f));
-    Object reflectiveST(&reflectiveShader, "../models/stormtrooper/stormtrooper.obj", &objects, "Reflective ST", glm::vec3(2.0f, 0.0f, 2.0f));
-    Object parallaxWall(&parallaxShader, "../models/parallax_wall/parallax.obj", &objects, "Parallax Wall", glm::vec3(-14.5f, 0.5f, -3.5f), glm::vec3(0.1f));
-    Object parallaxToy(&parallaxShader, "../models/parallax_toy/parallax.obj", &objects, "Parallax Toy", glm::vec3(-0.5f, 0.5f, -3.5f), glm::vec3(0.1f));
-    Object wallLeft(&objectShader, "../models/wood_floor/wood_floor.obj", &objects, "WallLeft", glm::vec3(14.0f, 1.0f, -0.3f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)), false);
-    Object wallRight(&objectShader, "../models/wood_floor/wood_floor.obj", &objects, "WallRight", glm::vec3(18.0f, 1.0f, -0.3f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)), false);
-    Object wallTop(&objectShader, "../models/wood_floor/wood_floor.obj", &objects, "WallTop", glm::vec3(16.0f, 3.0f, -0.3f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 0.0f)), false);
-    Object wallBack(&objectShader, "../models/wood_floor/wood_floor.obj", &objects, "WallBack", glm::vec3(16.0f, 3.0f, -17.0f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(90.0f, 0.0f, 0.0f)), false);
-    Object wallTest(&objectShader, "../models/wood_floor/wood_floor.obj", &objects, "WallTest", glm::vec3(0.0f, 1.0f, -15.0f), glm::vec3(0.25f, 0.25f, 0.25f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)), false);
-    Object light1(&objectShader, "../models/box/cube.obj", &objects, "Light 1", glm::vec3(-10.0f, 4.0f, -15.0f), glm::vec3(0.2f, 0.2f, 0.2f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)), true);
-    Object light2(&objectShader, "../models/box/cube.obj", &objects, "Light 2", glm::vec3(5.0f, 4.0f, -15.0f), glm::vec3(0.2f, 0.2f, 0.2f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)), true);
+    objects.clear();
 
-    for (Object* obj: objects) { if (obj->is_light()) { NUM_POINT_LIGHTS++; lights.push_back(obj); }}
+    auto Spawn = [&](Shader* sh, auto&&... args) -> Object* {
+        objects.push_back(std::make_unique<Object>(sh, std::forward<decltype(args)>(args)...));
+        return objects.back().get();
+    };
+    Spawn(&objectShader, "../models/stormtrooper/stormtrooper.obj", "Stormtrooper", glm::vec3(4.0f, -0.9f, -2.5f));
+    Spawn(&objectShader, "../models/backpack/backpack.obj", "backpack", glm::vec3(-9.5f, 0.1f, 1.5f), glm::vec3(0.5f));
+    Spawn(&objectShader, "../models/brick_wall/brick_wall.obj", "Brick Wall", glm::vec3(-7.5f, 0.5f, -3.5f), glm::vec3(0.1f));
+    Spawn(&objectShader, "../models/wood_floor/wood_floor.obj", "floor", glm::vec3(0.0f, -1.0f, 0.0f));
+    Spawn(&reflectiveShader, "../models/stormtrooper/stormtrooper.obj", "Reflective ST", glm::vec3(2.0f, 0.0f, 2.0f));
+    Spawn(&parallaxShader, "../models/parallax_wall/parallax.obj", "Parallax Wall", glm::vec3(-14.5f, 0.5f, -3.5f), glm::vec3(0.1f));
+    Spawn(&parallaxShader, "../models/parallax_toy/parallax.obj", "Parallax Toy", glm::vec3(-0.5f, 0.5f, -3.5f), glm::vec3(0.1f));
+    Spawn(&objectShader, "../models/wood_floor/wood_floor.obj", "WallLeft", glm::vec3(14.0f, 1.0f, -0.3f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)), false);
+    Spawn(&objectShader, "../models/wood_floor/wood_floor.obj", "WallRight", glm::vec3(18.0f, 1.0f, -0.3f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)), false);
+    Spawn(&objectShader, "../models/wood_floor/wood_floor.obj", "WallTop", glm::vec3(16.0f, 3.0f, -0.3f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 0.0f)), false);
+    Spawn(&objectShader, "../models/wood_floor/wood_floor.obj", "WallBack", glm::vec3(16.0f, 3.0f, -17.0f), glm::vec3(0.1f, 0.1f, 1.0f), eulerDegreesToQuat(glm::vec3(90.0f, 0.0f, 0.0f)), false);
+    Spawn(&objectShader, "../models/wood_floor/wood_floor.obj", "WallTest", glm::vec3(0.0f, 1.0f, -15.0f), glm::vec3(0.25f, 0.25f, 0.25f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)), false);
+    Spawn(&objectShader, "../models/box/cube.obj", "Light 1", glm::vec3(-10.0f, 4.0f, -15.0f), glm::vec3(0.2f, 0.2f, 0.2f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)), true);
+    Spawn(&objectShader, "../models/box/cube.obj", "Light 2", glm::vec3(5.0f, 4.0f, -15.0f), glm::vec3(0.2f, 0.2f, 0.2f), eulerDegreesToQuat(glm::vec3(0.0f, 0.0f, 90.0f)), true);
+
+    rebuildLights();
     objectShader.use();
     objectShader.setInt("NR_POINT_LIGHTS", NUM_POINT_LIGHTS); 
 
@@ -225,12 +232,12 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
         // sort the transparent windows
-        vector<glm::vec3> windows = sr.getWindows();
-        std::map<float, glm::vec3> sorted;
-        for (unsigned int i = 0; i < windows.size(); i++) {
-            float distance = glm::length(camera->Position - windows[i]);
-            sorted[distance] = windows[i];
-        }
+        // vector<glm::vec3> windows = sr.getWindows();
+        // std::map<float, glm::vec3> sorted;
+        // for (unsigned int i = 0; i < windows.size(); i++) {
+        //     float distance = glm::length(camera->Position - windows[i]);
+        //     sorted[distance] = windows[i];
+        // }
 
         // dirLight Anim
         if (animateDirLight) {
@@ -302,7 +309,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
 
         //render the objects normally (second pass)
         glCullFace(GL_BACK);
-        for (Object* obj : objects) {obj->Draw();}
+        for (auto& obj : objects) {obj->Draw();}
 
         // Pointlight cubes
         // pointlightcube.use();
@@ -376,7 +383,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
         }
 
         // if rendering onto a quad
-         if(renderToTexture && !showDepthMap) {
+        if(renderToTexture && !showDepthMap) {
             glBindFramebuffer(GL_FRAMEBUFFER, postProcessFramebuffer.ID);
             glDisable(GL_DEPTH_TEST);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
@@ -395,7 +402,7 @@ void Renderer::Render(GLFWwindow* window, Camera* camera, Controller* controller
             glEnable(GL_DEPTH_TEST); // RE-ENABLE if not rendering to texture
         }
 
-        // MARK: imgui
+        // render IMGUI
         renderIMGUI(postProcessFramebuffer, camera, io, window);
 
         // swap chain and IO handling
@@ -440,7 +447,7 @@ glm::mat4 Renderer::firstPass(Shader depthShader, Framebuffer framebuffer, Frame
     glBindFramebuffer(GL_FRAMEBUFFER, depthMapBuffer.ID);
     glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
     glClear(GL_DEPTH_BUFFER_BIT);
-    for (Object* obj : objects) { if(!obj->is_light()) { obj->Draw(depthShader); }}
+    for (auto& obj : objects) { if(!obj->is_light()) { obj->Draw(depthShader); }}
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.ID);
     glViewport(0, 0, fbWidth, fbHeight);
 
@@ -468,7 +475,7 @@ glm::mat4 Renderer::firstPass(Shader depthShader, Framebuffer framebuffer, Frame
         for (unsigned int face = 0; face < 6; ++face) { pointDepthShader.setMat4("shadowMatrices[" + std::to_string(face) + "]", shadowTransforms[face]); }
         pointDepthShader.setFloat("far_plane", point_far_plane);
         pointDepthShader.setVec3("lightPos", lights[i]->getPosition());
-        for (Object* obj : objects) { if(!obj->is_light()) { obj->Draw(pointDepthShader); }}
+        for (auto& obj : objects) { if(!obj->is_light()) { obj->Draw(pointDepthShader); }}
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glViewport(0, 0, fbWidth, fbHeight);
         glActiveTexture(GL_TEXTURE0 + 5 + i);
@@ -481,6 +488,21 @@ glm::mat4 Renderer::firstPass(Shader depthShader, Framebuffer framebuffer, Frame
 
 
     return lightSpaceMatrix;
+}
+
+// MARK: Rebuild Lights
+void Renderer::rebuildLights() {
+    lights.clear();
+    NUM_POINT_LIGHTS = 0;
+    for (auto& up : objects) {
+        Object* obj = up.get();   // extract raw pointer
+        if (obj->is_light()) {
+            if (NUM_POINT_LIGHTS < MAX_POINT_LIGHTS) {
+                lights.push_back(obj);
+                NUM_POINT_LIGHTS++;
+            }
+        }
+    }
 }
 
 // MARK: initialize ImGUI
@@ -661,7 +683,7 @@ void Renderer::renderIMGUI(Framebuffer postProcessFramebuffer, Camera* camera, I
     ImGui::Separator();
 
     for (int i = 0; i < (int)objects.size(); ++i) {
-        Object* obj = objects[i];
+        Object* obj = objects[i].get();
         const std::string& name = obj->getName();
 
         // simple filter
@@ -742,6 +764,7 @@ void Renderer::renderIMGUI(Framebuffer postProcessFramebuffer, Camera* camera, I
             obj->setScale(glm::vec3(1.0f));
         }
 
+        // light color changer
         if (obj->is_light()) {
             glm::vec3 color = obj->getLightColor();
 
@@ -758,6 +781,23 @@ void Renderer::renderIMGUI(Framebuffer postProcessFramebuffer, Camera* camera, I
             }
         }
 
+        // Delete selected object
+        ImGui::Separator();
+        if (ImGui::Button("Delete Object")) {
+            if (ui.selectedIndex >= 0 && ui.selectedIndex < (int)objects.size() && objects[ui.selectedIndex].get() == obj) {
+                objects.erase(objects.begin() + ui.selectedIndex);
+            } else {
+                auto it = std::find_if(objects.begin(), objects.end(), [&](const std::unique_ptr<Object>& p) { return p.get() == obj; });
+                if (it != objects.end()) {
+                    objects.erase(it);
+                }
+            }
+            ui.selected = nullptr;
+            ui.selectedIndex = -1;
+            ui.nameBufOwner = nullptr;
+            ui.nameBuf[0] = '\0';
+            rebuildLights();
+        }
         ImGui::End();
     }
 
